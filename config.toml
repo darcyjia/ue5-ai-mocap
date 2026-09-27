@@ -1,0 +1,58 @@
+# aimocap 配置。路径用正斜杠。
+
+[paths]
+work_root = "G:/claude/video/aimocap_work"          # 每条素材一个子目录
+dreamina = "C:/Users/xjia/bin/dreamina.exe"
+blender = "G:/Program Files/blender-4.5.13-windows-x64/blender.exe"
+ffmpeg = "C:/FFmpeg/bin/ffmpeg.exe"
+ue_cmd = "E:/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe"
+ue_project = "H:/UE_Project/Metahuman_export/Metahuman_export.uproject"
+wsl_distro = "Ubuntu-24.04"
+gvhmr_dir = "~/mocap/GVHMR"                          # WSL 内路径
+
+[generate]
+model = "seedance2.5"
+resolution = "480p"      # 做动捕源 480p 就够；1080p 实测没有改善脚滑/抖动
+duration = 15
+max_credits = 1200       # 单次生成的预估积分超过这个数就拒绝执行
+retries = 0              # 生成失败后自动重试次数（失败任务可能也会扣费）
+
+[solve]
+num_people = 2
+f_mm = 0                 # 等效焦距(mm)，0 = GVHMR 默认估计
+
+[clean]
+contact_on = 0.6         # 着地置信度滞回阈值
+contact_off = 0.4
+foot_max_height = 0.10   # 脚掌关节离地超过这个高度(m)不算着地
+min_segment = 3          # 着地片段最短帧数
+merge_gap = 4            # 两段着地之间的空档 ≤ 这么多帧……
+merge_max_lift = 0.12    # ……且空档里脚没有抬高超过这个高度(m)，就合并成一段
+ik_ramp = 3              # IK 在着地段首尾的渐变帧数
+
+[preview]
+enabled = true
+
+[ue]
+content_root = "/Game/AIMocap"                # 每条素材的资产放在 content_root/<素材名>
+retarget_dir = "/Game/AIMocap/_Retarget"      # 各 MetaHuman 角色共用的 IK Rig
+uniform_horizontal_scale = true               # 两人用统一的水平缩放，使步幅匹配目标角色腿长
+force_horizontal_scale = 0                    # >0 时强制使用这个水平缩放（调试/特殊需要）
+
+# 画面从左到右依次对应 person[0]、person[1] ……
+[[person]]
+name = "left"
+mh_mesh = "/Game/MetaHumans/NewMetaHumanCharacter/Body/SKM_NewMetaHumanCharacter_BodyMesh"
+
+[[person]]
+name = "right"
+mh_mesh = "/Game/MetaHumans/NewMetaHumanCharacter/Body/SKM_NewMetaHumanCharacter_BodyMesh"
+
+[qc]
+min_track_coverage = 0.95
+max_contact_depth_speed = 10.0   # 清理后着地脚深度方向速度中位数 cm/s
+max_reproj_cm = 6.0              # 脚踝重投影误差中位数
+max_penetration_pct = 5.0
+max_torso_err = 8.0              # 重定向后躯干前倾误差均值（度）
+max_head_err = 8.0
+max_arm_err = 5.0
