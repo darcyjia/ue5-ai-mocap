@@ -1,4 +1,4 @@
-"""回归测试：对 tests/golden.json 里登记的素材，重跑 clean + qc（不重跑 GVHMR/UE），
+"""回归测试：对 tests/golden.json 里登记的素材，只重跑 clean 和 qc（不重跑 GVHMR/Blender/UE），
 与登记的指标比较。改了清理或质检代码后跑一遍，确认没有变差。
   python -m aimocap test            比较
   python -m aimocap test --update   把当前结果登记为基准"""
@@ -28,7 +28,8 @@ def run_tests(cfg, update=False):
     fails = 0
     for name in list(g["clips"]):
         log(f"== 回归：{name}")
-        run_stages(cfg, name, frm="clean", to="qc", force=True)
+        run_stages(cfg, name, only="clean", force=True)   # 只重跑清理和质检，不动 GVHMR/Blender/UE
+        run_stages(cfg, name, only="qc", force=True)
         cur = _extract(load_json(Clip(cfg, name).qc / "metrics.json"))
         if update:
             g["clips"][name] = cur
