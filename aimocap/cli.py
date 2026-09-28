@@ -8,7 +8,7 @@
   python -m aimocap test  [--update]                          回归测试
   python -m aimocap install-ue-plugin                          把编辑器插件链接进 UE 工程
 （插件内部用：quote / uejob / mark）
-阶段顺序：generate → solve → clean → preview → fbx → ue → qc
+阶段顺序：generate → solve → clean → hands → preview → fbx → ue → qc
 """
 import argparse
 import json
@@ -19,10 +19,11 @@ from pathlib import Path
 
 from . import config as C
 from .state import Clip, State
-from .stages import clean, fbx, generate, preview, qc, solve, ue
+from .stages import clean, fbx, generate, hands, preview, qc, solve, ue
 from .util import load_json, log, params_hash
 
-STAGES = [("generate", generate), ("solve", solve), ("clean", clean), ("preview", preview),
+STAGES = [("generate", generate), ("solve", solve), ("clean", clean), ("hands", hands),
+          ("preview", preview),
           ("fbx", fbx), ("ue", ue), ("qc", qc)]
 NAMES = [n for n, _ in STAGES]
 

@@ -31,6 +31,21 @@ merge_gap = 4            # 两段着地之间的空档 ≤ 这么多帧……
 merge_max_lift = 0.12    # ……且空档里脚没有抬高超过这个高度(m)，就合并成一段
 ik_ramp = 3              # IK 在着地段首尾的渐变帧数
 
+[hands]
+# 手型状态：MediaPipe 识别四指弯曲角 → 拳 / 半握 / 掌，套预设到手指关节。追求感觉，不追求逐指还原。
+enabled = true           # false：手保持平伸（和 v0.1 一样）
+python = ".venv-tools/Scripts/python.exe"      # 装了 mediapipe + opencv 的独立环境（相对仓库根）
+model = "models/hand_landmarker.task"
+fist = 110               # 四指弯曲角 ≥ 这个值为拳
+palm = 55                # < 这个值为掌，中间为半握
+gap_fill = 8             # 识别不到的缺口 ≤ 这么多帧：沿用前后的手型
+fallback = "guard"       # 长缺口：出拳动作（手臂伸直+快）判为拳，其余用这个
+punch_elbow = 150        # 出拳判定：肘角(°) 大于这个……
+punch_speed = 2.5        # ……且手腕速度(m/s) 大于这个
+vote = 7                 # 多帧投票窗口
+min_segment = 5          # 手型片段最短帧数
+blend = 5                # 手型切换的过渡帧数
+
 [preview]
 enabled = true
 
@@ -59,3 +74,4 @@ max_penetration_pct = 5.0
 max_torso_err = 8.0              # 重定向后躯干前倾误差均值（度）
 max_head_err = 8.0
 max_arm_err = 5.0
+min_hand_detect = 0.6            # 手型识别率低于这个只警告（识别不到的帧按动作兜底）

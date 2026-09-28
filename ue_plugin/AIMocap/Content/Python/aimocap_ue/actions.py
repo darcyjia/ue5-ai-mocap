@@ -175,6 +175,47 @@ def redo():
     finish_in_editor(folder.name)
 
 
+# ---------------- 手型修正 ----------------
+def hand_fix():
+    if not _guard():
+        return
+    last = forms.load_last()
+    f = unreal.new_object(forms.AIMocapHandFix)
+    f.clip_folder = forms.dp(last.get("report_folder") or str(core.work_root()))
+    if not forms.show("AI 动捕：手型修正", f):
+        return
+    folder = Path(f.clip_folder.path)
+    forms.save_last({"report_folder": str(folder)})
+    cam = folder / "clean" / "camera.json"
+    if not cam.exists() or not (folder / "fbx" / "p0.fbx").exists():
+        return _msg("AI 动捕", f"{folder} 还没跑到导出阶段，不能修正手型。")
+    fps = json.loads(cam.read_text(encoding="utf-8"))["fps"]
+    a, b = sorted((f.from_sec, f.to_sec))
+    fix = {"p": int(f.person), "hand": forms.HAND_NAME[int(f.hand)], "from": round(a * fps), "to": round(b * fps),
+           "state": forms.HAND_STATE[int(f.state)]}
+    hj = folder / "input" / "hands.json"
+    fixes = [] if f.clear_all or not hj.exists() else json.loads(hj.read_text(encoding="utf-8"))
+    fixes.append(fix)
+    hj.write_text(json.dumps(fixes, ensure_ascii=False, indent=1), encoding="utf-8")
+    clip = folder.name
+
+    def done(job, ok):
+        if not ok:
+            return _msg("AI 动捕：失败", "\n".join(job.lines[-20:]))
+        finish_in_editor(clip)
+    core.start(f"手型修正 {clip}", clip, ["run", clip, "--from", "hands", "--to", "fbx", "--no-preview"], done)
+    _msg("AI 动捕", f"已记录修正（共 {len(fixes)} 条，存在 input/hands.json）：\n"
+                    f"p{fix['p']} {fix['hand']} 第 {fix['from']}–{fix['to']} 帧 → {fix['state']}\n\n"
+                    "后台重做手型和导出（约 20 秒，不重新识别），完成后自动重做重定向。")
+
+
+def open_hands():
+    folder = _pick_clip("AI 动捕：查看手型识别")
+    if folder:
+        tl = folder / "hands" / "timeline.png"
+        core.open_path(tl) if tl.exists() else _msg("AI 动捕", f"{tl} 不存在（这个素材还没跑手型阶段）。")
+
+
 # ---------------- 构图板候选（免费） ----------------
 def plates():
     if not _guard():

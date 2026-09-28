@@ -78,7 +78,7 @@ for k, f in enumerate(files):
     for t in range(L):
         pb["pelvis"].location = tr[t].tolist()
         pb["pelvis"].keyframe_insert("location", frame=t + 1)
-        for i in range(22):
+        for i in range(55):
             pb[SMPLX[i]].rotation_quaternion = quat[t, i].tolist()
             pb[SMPLX[i]].keyframe_insert("rotation_quaternion", frame=t + 1)
 

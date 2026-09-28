@@ -13,6 +13,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from ..kinematics import COCO_L_ANKLE, COCO_R_ANKLE, L_ANKLE, L_FOOT, PELVIS, R_ANKLE, R_FOOT, load_person, project
+from ..handpose import STATE_CN
 from ..util import file_sig, load_json, save_json
 
 plt.rcParams["font.sans-serif"] = ["Microsoft YaHei", "SimHei"]
@@ -22,7 +23,7 @@ plt.rcParams["axes.unicode_minus"] = False
 def params(c, cfg):
     n = cfg["solve"]["num_people"]
     return {"in": [file_sig(c.clean / f"p{k}.npz") for k in range(n)], "ue": file_sig(c.ue / "result.json"),
-            "qc": cfg["qc"]}
+            "hands": file_sig(c.hands / "hands.json"), "qc": cfg["qc"]}
 
 
 def outputs(c, cfg):
@@ -118,6 +119,13 @@ def run(c, cfg, args):
             dev = abs(ue_r["spacing_ratio_median"] / ue_r["spacing_ratio_expected"] - 1) * 100
             check(rows, f"两人间距比 {ue_r['spacing_ratio_median']}（期望 {ue_r['spacing_ratio_expected']}）偏差 %", dev, 8.0,
                   warn_only=True)
+    hands = load_json(c.hands / "hands.json", {}) or {}
+    for hp in hands.get("persons", []):
+        for side, hr in hp["hands"].items():
+            share = " ".join(f"{STATE_CN[s]}{v:.0%}" for s, v in hr["share"].items())
+            check(rows, f"p{hp['person']} {'左' if side == 'L' else '右'}手 手型识别率（{share}）", hr["detect_rate"],
+                  q["min_hand_detect"], "min", warn_only=True)
+    M["hands"] = hands
     footprint(c, n, par, c.qc / "footprint.png")
     M["checks"] = [dict(zip(("name", "value", "limit", "status"), r)) for r in rows]
     M["status"] = "fail" if any(r[3] == "fail" for r in rows) else ("warn" if any(r[3] == "warn" for r in rows) else "ok")
@@ -142,6 +150,12 @@ def write_html(c, M, rows, ue_r):
         if p.exists():
             vids += f"<h3>p{k} GVHMR 叠合</h3><video src='{rel(p)}' controls width='49%'></video>"
     seq = f"<p>UE 关卡序列：<code>{html.escape(ue_r['sequence'])}</code>，水平缩放 {ue_r['horizontal_scale']}</p>" if ue_r else ""
+    hands = ""
+    if (c.hands / "timeline.png").exists():
+        crops = "".join(f"<img src='{rel(c.hands / 'crops' / f)}' width='112' title='{html.escape(f)}'>"
+                        for f in M["hands"].get("samples", []) if (c.hands / "crops" / f).exists())
+        hands = (f"<h2>手型时间线</h2><p>不对可以写 input/hands.json 手动覆盖（插件：AI 动捕 → 手型修正…）</p>"
+                 f"<img src='{rel(c.hands / 'timeline.png')}' width='100%'><h3>识别抽样（左上角数字为弯曲角）</h3>{crops}")
     s = M["solve"]
     doc = f"""<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>{html.escape(c.name)} 质检</title>
 <style>body{{font-family:'Microsoft YaHei',sans-serif;max-width:1200px;margin:24px auto;padding:0 16px;color:#111}}
@@ -151,6 +165,6 @@ table{{border-collapse:collapse;width:100%}}td,th{{border-bottom:1px solid #e5e7
 <p>相机高度 {s.get('camera_height_m', 0):.2f} m，焦距 {s.get('lens_mm', 0):.1f} mm，重力方向两人一致性 {s.get('rc2gv_person_agree_deg')}°，
 两人骨盆间距 {s.get('pelvis_dist_m')}</p>{seq}
 <table><tr><th>检查项</th><th>值</th><th>阈值</th><th>结果</th></tr>{tr}</table>
-<h2>着地脚俯视轨迹</h2><img src="footprint.png" width="100%">{vids}
+<h2>着地脚俯视轨迹</h2><img src="footprint.png" width="100%">{hands}{vids}
 <h2>清理统计</h2><pre>{html.escape(str(M['cleanup']))}</pre></body></html>"""
     (c.qc / "report.html").write_text(doc, encoding="utf-8")

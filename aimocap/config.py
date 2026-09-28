@@ -9,12 +9,16 @@ DEFAULTS = {
     "solve": {"num_people": 2, "f_mm": 0},
     "clean": {"contact_on": 0.6, "contact_off": 0.4, "foot_max_height": 0.10, "min_segment": 3,
               "merge_gap": 4, "merge_max_lift": 0.12, "ik_ramp": 3},
+    "hands": {"enabled": True, "python": ".venv-tools/Scripts/python.exe", "model": "models/hand_landmarker.task",
+              "fist": 110, "palm": 55, "gap_fill": 8, "fallback": "guard", "punch_elbow": 150, "punch_speed": 2.5,
+              "vote": 7, "min_segment": 5, "blend": 5},
     "preview": {"enabled": True},
     "ue": {"content_root": "/Game/AIMocap", "retarget_dir": "/Game/AIMocap/_Retarget",
            "uniform_horizontal_scale": True},
     "person": [],
     "qc": {"min_track_coverage": 0.95, "max_contact_depth_speed": 10.0, "max_reproj_cm": 6.0,
-           "max_penetration_pct": 5.0, "max_torso_err": 8.0, "max_head_err": 8.0, "max_arm_err": 5.0},
+           "max_penetration_pct": 5.0, "max_torso_err": 8.0, "max_head_err": 8.0, "max_arm_err": 5.0,
+           "min_hand_detect": 0.6},
 }
 
 

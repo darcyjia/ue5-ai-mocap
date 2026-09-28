@@ -62,6 +62,45 @@ class AIMocapPlates(unreal.Object):
     clip_name = unreal.uproperty(str, meta={"Category": "构图板", "DisplayName": "素材名"})
 
 
+@unreal.uenum()
+class AIMocapPerson(unreal.EnumBase):
+    LEFT = unreal.uvalue(0, meta={"DisplayName": "画面左边的人（p0）"})
+    RIGHT = unreal.uvalue(1, meta={"DisplayName": "画面右边的人（p1）"})
+
+
+@unreal.uenum()
+class AIMocapHand(unreal.EnumBase):
+    BOTH = unreal.uvalue(0, meta={"DisplayName": "双手"})
+    LEFT = unreal.uvalue(1, meta={"DisplayName": "左手（角色自己的左手）"})
+    RIGHT = unreal.uvalue(2, meta={"DisplayName": "右手（角色自己的右手）"})
+
+
+@unreal.uenum()
+class AIMocapHandState(unreal.EnumBase):
+    FIST = unreal.uvalue(0, meta={"DisplayName": "拳"})
+    GUARD = unreal.uvalue(1, meta={"DisplayName": "半握（戒备）"})
+    PALM = unreal.uvalue(2, meta={"DisplayName": "掌（四指并拢伸直）"})
+    RELAXED = unreal.uvalue(3, meta={"DisplayName": "放松"})
+
+
+HAND_NAME = {0: "LR", 1: "L", 2: "R"}
+HAND_STATE = {0: "fist", 1: "guard", 2: "palm", 3: "relaxed"}
+
+
+@unreal.uclass()
+class AIMocapHandFix(unreal.Object):
+    # 逆序声明（UE 属性面板倒着显示）
+    clear_all = unreal.uproperty(bool, meta={"Category": "3 其它", "DisplayName": "先清空这个素材已有的手动修正",
+                                             "ToolTip": "勾上后只保留这一条（手型改回自动识别的结果再加这条）"})
+    state = unreal.uproperty(AIMocapHandState, meta={"Category": "2 修正", "DisplayName": "改成"})
+    to_sec = unreal.uproperty(float, meta={"Category": "2 修正", "DisplayName": "到（秒）", "ClampMin": "0"})
+    from_sec = unreal.uproperty(float, meta={"Category": "2 修正", "DisplayName": "从（秒）", "ClampMin": "0",
+                                             "ToolTip": "和手型时间线图、关卡序列的时间一致（序列从 0 秒开始）"})
+    hand = unreal.uproperty(AIMocapHand, meta={"Category": "2 修正", "DisplayName": "哪只手"})
+    person = unreal.uproperty(AIMocapPerson, meta={"Category": "2 修正", "DisplayName": "哪个人"})
+    clip_folder = unreal.uproperty(unreal.DirectoryPath, meta={"Category": "1 素材", "DisplayName": "素材目录"})
+
+
 @unreal.uclass()
 class AIMocapPickClip(unreal.Object):
     clip_folder = unreal.uproperty(unreal.DirectoryPath, meta={"Category": "素材", "DisplayName": "素材目录"})

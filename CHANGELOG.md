@@ -11,6 +11,10 @@
 - 花积分必须显式确认：命令行要 `--allow-spend`，插件弹窗显示预估和余额
 - 新命令：`install-ue-plugin`、`quote`、`uejob`、`mark`；`run --no-preview`
 - `ue_pipeline.py` 重构为 `run_job()`，命令行入口 `ue_commandlet.py`
+- **手型**：新阶段 hands（clean 与 preview 之间）。MediaPipe 识别四指弯曲 → 拳 / 半握 / 掌，平滑后套预设到 SMPL-X 手指关节；识别不到按前后手型和出拳动作兜底；`input/hands.json` 手动覆盖；质检报告加手型时间线和识别抽样。测试素材识别率 75–93%
+- 插件新增「手型修正…」「查看手型识别…」
+- preview / fbx 改读 `hands/`；FBX 导出全部 55 个关节（原来只有身体 22 个）
+- 新增 `[hands]` 配置段、`[qc] min_hand_detect`；手部识别用独立环境 `.venv-tools`（不进 git）
 
 ## v0.1.0 — 2026-09-28
 

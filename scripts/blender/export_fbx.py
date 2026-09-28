@@ -77,7 +77,7 @@ for f in sorted(glob.glob(os.path.join(D, "p*.npz"))):
     for t in range(L):
         pb["pelvis"].location = (C @ T[t] * SCALE - lift).tolist()
         pb["pelvis"].keyframe_insert("location", frame=t + 1)
-        for i in range(22):
+        for i in range(55):             # 含手指（hands 阶段套的手型）
             q = Matrix((C @ q2m(Q[t, i]) @ C.T).tolist()).to_quaternion()
             if i in prev and q.dot(prev[i]) < 0:
                 q.negate()

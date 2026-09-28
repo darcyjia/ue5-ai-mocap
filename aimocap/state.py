@@ -6,7 +6,7 @@ from .util import load_json, save_json
 
 class Clip:
     """一条素材的工作目录。"""
-    DIRS = ("input", "solve", "clean", "blender", "fbx", "ue", "qc", "logs")
+    DIRS = ("input", "solve", "clean", "hands", "blender", "fbx", "ue", "qc", "logs")
 
     def __init__(self, cfg, name):
         self.name = name

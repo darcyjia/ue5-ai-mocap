@@ -32,6 +32,8 @@ python -m aimocap test                    # 回归测试
 - **用提示词生成时会先弹窗**，显示预估积分和当前余额，点「是」才会提交
 - **出构图板候选（免费）…**：即梦文生图出几张候选，完成后打开所在文件夹
 - **换角色 / 重做重定向…**：已解算的素材换 MetaHuman，只重做 UE 部分（几十秒）
+- **手型修正…**：把某人某只手在某段时间（秒）改成拳 / 半握 / 掌 / 放松，写进 `input/hands.json`，只重做手型、导出和 UE 部分（不重新识别）
+- **查看手型识别…**：打开素材的手型时间线图
 - **任务状态 / 打开质检报告 / 打开工作目录 / 打开配置文件**
 
 插件是纯 Python（UE 5.8 自带 Python 插件），界面用 UE 的属性面板对话框。重活由系统 Python 跑本工具的命令行，UE 阶段在编辑器里运行（与命令行共用 `scripts/ue/ue_pipeline.py`）。
@@ -45,6 +47,7 @@ python -m aimocap test                    # 回归测试
 | generate | Windows / 即梦 CLI | 构图板 + 编排提示词 → Seedance 视频；已有视频则跳过 | `input/video.mp4` |
 | solve | WSL2 / GVHMR | 多人追踪（按画面从左到右编号 p0、p1…）→ 每人 GVHMR → 共享坐标系、重力对齐、贴地 | `solve/p*.npz`、`camera.json`、`track.json` |
 | clean | Windows | 脚部锁定：每人贴地、着地检测并合并碎片、根部水平校正、腿部 IK | `clean/p*.npz`、`cleanup.json` |
+| hands | Windows / `.venv-tools`（MediaPipe） | 识别四指弯曲 → 拳 / 半握 / 掌，平滑后把预设手型套到手指关节；`input/hands.json` 手动覆盖 | `hands/p*.npz`、`hands.json`、`timeline.png` |
 | preview | Blender 4.5 | SMPL-X 场景 + 原机位/3/4 机位渲染 + 三联画 | `blender/preview.blend`、`triptych.mp4` |
 | fbx | Blender 4.5 | UE 骨骼命名、厘米、Z 朝上的 FBX | `fbx/p*.fbx` |
 | ue | UE 5.8（命令行或编辑器插件） | 导入 → IK Rig → 重定向到 MetaHuman → 专用关卡 + 完整 MetaHuman + 序列 → 度量 | UE 里 `/Game/AIMocap/<素材>/`，`ue/result.json` |
@@ -58,6 +61,7 @@ python -m aimocap test                    # 回归测试
 - `[generate]`：分辨率（动捕源 480p 足够，1080p 实测没有改善）、时长、积分上限、失败重试次数
 - `[[person]]`：**按画面从左到右**指定每个人用哪个 MetaHuman 身体网格
 - `[ue] uniform_horizontal_scale`：两人使用统一的水平缩放（= 两人"目标骨盆高 / 源骨盆高"的平均），让步幅匹配目标角色的腿长，同时保持两人相对位置
+- `[hands]`：手型识别阈值（弯曲角 ≥110° 拳、<55° 掌）、平滑、识别不到时的兜底；`enabled = false` 恢复平伸手
 - `[qc]`：质检阈值
 - 临时覆盖写在 `config.local.toml`（不进 git）
 
@@ -69,10 +73,32 @@ python -m aimocap test                    # 回归测试
 - **脚踝重投影误差**：3D 结果投影回画面和 ViTPose 的差，超过 6 cm 说明解算和视频对不上
 - **重定向误差**：躯干前倾、头部俯仰、手臂方向与源动作的差；驼背/低头类问题在这里会被拦下
 - 俯视脚印图：锁定成功时，每次着地聚成一个点
+- **手型**：每只手的识别率和拳/半握/掌占比，时间线图（色块 = 最终手型，黑点 = 识别出的弯曲角），和识别抽样裁剪图
+
+## 手型（hands 阶段）
+
+识别在单独的 Python 环境里跑（MediaPipe 和主环境的依赖不混）。装一次：
+
+```
+py -3.12 -m venv .venv-tools
+.venv-tools\Scripts\python -m pip install mediapipe==1.0.1 opencv-python
+mkdir models
+curl -L -o models/hand_landmarker.task https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task
+```
+
+做法：沿前臂方向在手腕外侧裁出手部、放大到 224，交给 MediaPipe HandLandmarker 取 3D 关键点，算四指总弯曲角；
+≥110° 拳、<55° 掌、中间半握。识别不到的短缺口沿用前后手型，长缺口里"手臂快速伸直"判为拳，其余半握。
+然后 7 帧投票、去掉短于 5 帧的片段，预设旋转沿时间平滑出约 5 帧的过渡。识别结果缓存，改阈值或手动覆盖只要 1 秒。
+
+手动覆盖 `input/hands.json`（帧号；插件「手型修正…」按秒填，会自动换算）：
+```json
+[{"p": 0, "hand": "R", "from": 120, "to": 180, "state": "palm"}]
+```
+`hand` 可以是 `L`、`R`、`LR`（双手）；`state` 是 `fist` / `guard` / `palm` / `relaxed`。
 
 ## 已知限制
 
-- **没有手指**：GVHMR 只出身体 21 个关节，MetaHuman 手是平掌
+- **手指是状态，不是逐指还原**：GVHMR 不解手指，hands 阶段只判断拳 / 半握 / 掌 / 放松四种手型，再套预设。识别不到的帧（约 10–25%）按前后手型或动作兜底；手势类细节（剑指、鹰爪）需要手动覆盖或新增预设（`aimocap/handpose.py`）
 - Seedance 在快速肢体交错时会形变，没有技术对策，一条编排多生成几版挑干净的
 - 720p 的积分单价未实测，是估算值
 
