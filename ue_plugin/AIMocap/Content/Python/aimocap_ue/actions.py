@@ -83,8 +83,12 @@ def new_job():
         res = forms.RES_NAME[res_i]
         q = core.cli_json(["quote", "--resolution", res, "--duration", str(f.duration)])
         if q["balance"] is None:
-            return _msg("AI 动捕", "读不到即梦的登录状态（没有提交，也没有扣费）。\n"
-                                   "稍等一两分钟再试；仍然不行就在终端运行 dreamina login 重新登录。")
+            return _msg("AI 动捕", "读不到即梦的登录状态（没有提交，也没有扣费）。\n\n"
+                                   "即梦把登录令牌存在 Windows 凭据库里。如果当初是在 Claude 桌面应用里登录的，"
+                                   "令牌会被隔离在 Claude 里，UE 看不到。\n\n"
+                                   "解决：从开始菜单打开普通的 PowerShell（不要从 Claude 里开），运行\n"
+                                   "    C:\\Users\\xjia\\bin\\dreamina.exe login\n"
+                                   "用抖音扫码授权，然后回来重试（不用重启 UE）。")
         if q["estimate"] > q["max_credits"]:
             return _msg("AI 动捕", f"预估 {q['estimate']} 积分，超过配置的上限 {q['max_credits']}。")
         if _msg("确认花费积分", f"用 Seedance 生成 {res}、{f.duration} 秒的视频：\n\n预估 {q['estimate']} 积分，"
