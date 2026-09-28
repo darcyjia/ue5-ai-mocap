@@ -114,7 +114,16 @@ class BackgroundJob:
             self.handle = None
             ok = self.proc.returncode == 0
             unreal.log(f"[AI 动捕] 结束：{self.title}（{'成功' if ok else '失败'}，{time.time() - self.t0:.0f}s）")
-            self.on_done(self, ok)
+            try:
+                self.on_done(self, ok)
+            except Exception:
+                import traceback
+                tb = traceback.format_exc()
+                unreal.log_error(f"[AI 动捕] 后续步骤出错：\n{tb}")
+                unreal.EditorDialog.show_message(
+                    "AI 动捕：出错", f"「{self.clip}」后台处理已完成，但编辑器内的后续步骤出错：\n\n{tb[-1500:]}\n\n"
+                    "修好后可以用「换角色 / 重做重定向…」只重做 UE 部分。",
+                    unreal.AppMsgType.OK, unreal.AppReturnType.OK)
 
     def elapsed(self):
         return time.time() - self.t0

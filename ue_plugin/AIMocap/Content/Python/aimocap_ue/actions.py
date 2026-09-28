@@ -120,12 +120,15 @@ def finish_in_editor(clip):
     import ue_pipeline
     importlib.reload(ue_pipeline)
     job = core.cli_json(["uejob", clip])
-    les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
-    cur = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
-    if cur and cur.get_outermost().is_dirty() and _msg(
-            "AI 动捕", "当前关卡有未保存的修改。接下来会切换到素材专用关卡，是否先保存当前关卡？",
-            unreal.AppMsgType.YES_NO, YES) == YES:
-        les.save_current_level()
+    # UE 5.8 的 Python 里 Package 没有 is_dirty()；用未保存的关卡包列表判断。检查本身出错就跳过，不挡主流程
+    try:
+        dirty = bool(unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages())
+    except Exception as ex:
+        unreal.log_warning(f"[AI 动捕] 检查未保存关卡失败，跳过：{ex}")
+        dirty = False
+    if dirty and _msg("AI 动捕", "当前关卡有未保存的修改。接下来会切换到素材专用关卡，是否先保存当前关卡？",
+                      unreal.AppMsgType.YES_NO, YES) == YES:
+        unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, False)
     with unreal.ScopedSlowTask(8, f"AI 动捕：{clip} 重定向到 MetaHuman") as task:
         task.make_dialog(True)
         res = ue_pipeline.run_job(job, step=lambda m: task.enter_progress_frame(1, f"AI 动捕：{m}"))
