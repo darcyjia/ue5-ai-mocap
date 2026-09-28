@@ -86,26 +86,44 @@ def run_(c, cfg, args):
                          "解决：从开始菜单打开普通的 PowerShell（不要从 Claude 里开），运行 dreamina login 扫码登录一次。")
     log(f"生成视频：{g['model']} {g['resolution']} {g['duration']}s，预估 {est} 积分，当前余额 {before}")
     prompt = c.prompt.read_text(encoding="utf-8").strip()
-    last = None
-    for attempt in range(1 + g["retries"]):
+    # 两类失败不扣费，自动重试（最多 2 次，不占 retries）：
+    #   提交前被拒「未检测到有效登录态」；图片上传到字节存储失败（2026-09-28 实测偶发，任务未生成、余额不变）。
+    # retries 只管其它可能已扣费的失败。
+    last, attempt, free_left, paid_left = None, 0, 2, g["retries"]
+    while True:
+        attempt += 1
         j, out = _cli(cfg, ["image2video", f"--image={plate}", f"--prompt={prompt}",
                             f"--model_version={g['model']}", f"--duration={g['duration']}",
                             f"--video_resolution={g['resolution']}", "--poll=0"], c.logs / "generate_submit.log")
         sid = j.get("submit_id")
         if not sid:
+            if NOT_LOGGED_IN in out and free_left > 0:
+                free_left -= 1
+                log("提交时读不到登录状态（未扣费），8 秒后重试")
+                time.sleep(8)
+                continue
             raise RuntimeError("提交失败：\n" + out[-2000:])
-        log(f"已提交 {sid}（第 {attempt + 1} 次）")
+        log(f"已提交 {sid}（第 {attempt} 次）")
         try:
             r = _poll(cfg, sid, c.logs)
             url = r["result_json"]["videos"][0]["video_url"]
             _download(url, c.video)
             after = credits(cfg)
             log(f"已下载 {c.video}，余额 {before} → {after}")
-            return {"submit_id": sid, "credits_before": before, "credits_after": after}
+            return {"submit_id": sid, "credits_before": before, "credits_after": after, "attempts": attempt}
         except RuntimeError as ex:
             last = ex
             log(f"失败：{ex}")
-    raise RuntimeError(f"生成失败（共 {1 + g['retries']} 次）：{last}")
+            if "upload resource" in str(ex) and free_left > 0:
+                free_left -= 1
+                log("图片上传失败（任务没有生成，不扣费），30 秒后自动重试")
+                time.sleep(30)
+                continue
+            if paid_left > 0:
+                paid_left -= 1
+                continue
+            break
+    raise RuntimeError(f"生成失败（共 {attempt} 次）：{last}")
 
 
 def run(c, cfg, args):
