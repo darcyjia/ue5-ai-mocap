@@ -8,7 +8,9 @@ Body 组件。这样头、衣服、头发都在（模板式 spawnable 拿不到�
 - 重定向姿态只对齐手臂/手指；auto_align_all_bones 会让 MetaHuman 驼背 ~30°、低头 ~55°。
 - UE 只按比例缩放骨盆的垂直运动，水平原样传递 → 统一的 scale_horizontal 让步幅匹配目标角色腿长。
 - 同名资产删除后立刻 create_asset 会返回 None → 已存在就加载后重新配置，不删。
-- 命令行无渲染：不能导出带网格的 FBX。"""
+- 命令行无渲染：不能导出带网格的 FBX。
+- 对已存在的骨骼网格再导入同一个 FBX，UE 走 atomic reimport：只重导网格，**不重导动画**，
+  会一直用第一次导入的旧动作 → 源资产按 FBX 指纹放进新目录 src/p<k>_<指纹>，用完删掉旧目录。"""
 import json
 import math
 import os
@@ -50,7 +52,30 @@ def load_or_create(path, cls, factory):
     return _at().create_asset(n, d, cls, factory), True
 
 
+def fbx_dest(cd, k, fbx):
+    st = os.stat(fbx)
+    return f"{cd}/src/p{k}_{st.st_size:x}{st.st_mtime_ns // 1000000 % (1 << 32):08x}"
+
+
+def cleanup_sources(cd, keep, log):
+    """删掉不再使用的源资产目录（旧指纹的 src/p*_*，以及早期版本放在 <素材>/p<k> 的）。"""
+    old = [d for d in EAL.list_assets(f"{cd}/src", recursive=True, include_folder=True) if d.endswith("/")]
+    old = sorted({d.rstrip("/") for d in old} - set(keep))
+    old += [f"{cd}/p{k}" for k in range(len(keep)) if EAL.does_directory_exist(f"{cd}/p{k}")]
+    for d in old:
+        try:
+            EAL.delete_directory(d)
+            log("deleted old source", d)
+        except Exception as ex:
+            log("could not delete", d, ex)
+
+
 def import_fbx(fbx, dest, fps):
+    existing = [unreal.load_asset(x) for x in EAL.list_assets(dest, recursive=False)]         if EAL.does_directory_exist(dest) else []
+    mesh = next((x for x in existing if isinstance(x, unreal.SkeletalMesh)), None)
+    anim = next((x for x in existing if isinstance(x, unreal.AnimSequence)), None)
+    if mesh and anim:                     # 同一个 FBX 已导入过
+        return mesh, anim
     unreal.SystemLibrary.execute_console_command(None, "Interchange.FeatureFlags.Import.FBX False")
     ui = unreal.FbxImportUI()
     for k, v in dict(import_mesh=True, import_as_skeletal=True, import_animations=True, import_materials=False,
@@ -299,7 +324,7 @@ def run_job(job, log=_log, step=lambda msg: None):
     step("导入 FBX")
     people = []
     for k, fbx in enumerate(job["fbx"]):
-        mesh, anim = import_fbx(fbx, f"{cd}/p{k}", job["fps"])
+        mesh, anim = import_fbx(fbx, fbx_dest(cd, k, fbx), job["fps"])
         people.append(dict(mesh=mesh, anim=anim, cfg=job["persons"][k]))
         log(f"p{k} imported", anim.get_path_name(), "frames", AL.get_num_frames(anim))
     step("准备素材关卡和角色")
@@ -328,6 +353,7 @@ def run_job(job, log=_log, step=lambda msg: None):
     step("导出动画")
     export_anims(people, job["export_dir"])
     unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, True)
+    cleanup_sources(cd, [fbx_dest(cd, k, f) for k, f in enumerate(job["fbx"])], log)
     res["ok"] = True
     with open(job["result"], "w", encoding="utf-8") as f:
         json.dump(res, f, ensure_ascii=False, indent=1)
