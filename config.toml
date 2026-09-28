@@ -5,6 +5,7 @@ work_root = "G:/claude/video/aimocap_work"          # 每条素材一个子目�
 dreamina = "C:/Users/xjia/bin/dreamina.exe"
 blender = "G:/Program Files/blender-4.5.13-windows-x64/blender.exe"
 ffmpeg = "C:/FFmpeg/bin/ffmpeg.exe"
+python = "C:/Python313/python.exe"                  # 带 numpy/scipy/matplotlib 的系统 Python（编辑器插件用它调本工具）
 ue_cmd = "E:/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe"
 ue_project = "H:/UE_Project/Metahuman_export/Metahuman_export.uproject"
 wsl_distro = "Ubuntu-24.04"
@@ -40,13 +41,15 @@ uniform_horizontal_scale = true               # 两人用统一的水平缩放�
 force_horizontal_scale = 0                    # >0 时强制使用这个水平缩放（调试/特殊需要）
 
 # 画面从左到右依次对应 person[0]、person[1] ……
+# mh_bp：MetaHuman 蓝图（完整角色，带头/衣服/头发）；没有 mh_bp 时退回到只用 mh_mesh 身体网格。
+# 单段素材可在 <素材>/input/persons.json 里覆盖（编辑器插件的表单会写这个文件）。
 [[person]]
 name = "left"
-mh_mesh = "/Game/MetaHumans/NewMetaHumanCharacter/Body/SKM_NewMetaHumanCharacter_BodyMesh"
+mh_bp = "/Game/MetaHumans/NewMetaHumanCharacter/BP_NewMetaHumanCharacter"
 
 [[person]]
 name = "right"
-mh_mesh = "/Game/MetaHumans/NewMetaHumanCharacter/Body/SKM_NewMetaHumanCharacter_BodyMesh"
+mh_bp = "/Game/MetaHumans/NewMetaHumanCharacter/BP_NewMetaHumanCharacter"
 
 [qc]
 min_track_coverage = 0.95

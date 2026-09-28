@@ -4,15 +4,25 @@ import time
 import urllib.request
 from pathlib import Path
 
-from ..util import extract_json, file_sig, log, run as sh
+from ..util import extract_json, file_sig, load_json, log, run as sh
 
 # 实测单价（积分/秒，seedance2.5）：480p 15s=180，1080p 15s=960。720p 未实测，按中间值估。
 COST_PER_SEC = {"480p": 12, "720p": 32, "1080p": 64}
 
 
+def gen_cfg(c, cfg):
+    """单段素材可在 input/generate.json 里覆盖分辨率、时长等（插件表单写这个文件）。"""
+    return {**cfg["generate"], **(load_json(c.input / "generate.json", {}) or {})}
+
+
+def estimate(cfg, resolution=None, duration=None):
+    g = cfg["generate"]
+    return COST_PER_SEC[resolution or g["resolution"]] * int(duration or g["duration"])
+
+
 def params(c, cfg):
     return {"video": file_sig(c.video), "prompt": file_sig(c.prompt),
-            "plate": file_sig(c.plate()) if c.plate() else None, **cfg["generate"]}
+            "plate": file_sig(c.plate()) if c.plate() else None, **gen_cfg(c, cfg)}
 
 
 def outputs(c, cfg):
@@ -48,13 +58,15 @@ def _download(url, dst):
 
 
 def run_(c, cfg, args):
-    g = cfg["generate"]
+    g = gen_cfg(c, cfg)
     plate = c.plate()
     if not c.prompt.exists() or plate is None:
         raise SystemExit(f"没有 {c.video}，也缺少生成所需的 input/prompt.txt 或 input/plate.*")
-    est = COST_PER_SEC[g["resolution"]] * g["duration"]
+    est = estimate(cfg, g["resolution"], g["duration"])
     if est > g["max_credits"]:
         raise SystemExit(f"预估 {est} 积分，超过 max_credits={g['max_credits']}，未执行")
+    if not getattr(args, "allow_spend", False):
+        raise SystemExit(f"生成视频要花约 {est} 积分（余额 {credits(cfg)}）。确认后加 --allow-spend 重跑")
     before = credits(cfg)
     log(f"生成视频：{g['model']} {g['resolution']} {g['duration']}s，预估 {est} 积分，当前余额 {before}")
     prompt = c.prompt.read_text(encoding="utf-8").strip()

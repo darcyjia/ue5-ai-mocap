@@ -1,0 +1,17 @@
+{
+	"FileVersion": 3,
+	"Version": 2,
+	"VersionName": "0.2.0",
+	"FriendlyName": "AI 动捕",
+	"Description": "AI 视频 → 双人动捕 → MetaHuman。前端界面，重活交给 aimocap 命令行工具。",
+	"Category": "Animation",
+	"CreatedBy": "aimocap",
+	"CanContainContent": true,
+	"EnabledByDefault": true,
+	"IsBetaVersion": true,
+	"Plugins": [
+		{ "Name": "PythonScriptPlugin", "Enabled": true },
+		{ "Name": "EditorScriptingUtilities", "Enabled": true },
+		{ "Name": "IKRig", "Enabled": true }
+	]
+}

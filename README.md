@@ -11,10 +11,11 @@ cd G:/claude/video/aimocap
 python -m aimocap new fight_01 --video 某视频.mp4
 python -m aimocap run fight_01
 
-# 从提示词生成（花积分，按 config 的 max_credits 限额）
+# 从提示词生成（花积分：必须加 --allow-spend，且不超过 config 的 max_credits）
 python -m aimocap plate fight_01 --prompt 构图板提示词.txt   # 免费出 4 张构图板候选到 input/plates/
 python -m aimocap new   fight_01 --prompt 编排.txt --plate input/plates/挑中的那张.jpg
-python -m aimocap run   fight_01
+python -m aimocap run   fight_01              # 会先报预估积分并停下
+python -m aimocap run   fight_01 --allow-spend
 
 python -m aimocap status fight_01         # 各阶段状态
 python -m aimocap run fight_01 --from ue  # 从某一阶段重跑（改了角色、重定向参数时）
@@ -22,6 +23,20 @@ python -m aimocap test                    # 回归测试
 ```
 
 跑 `ue` 阶段前**必须关闭 UE 编辑器**（命令行模式写资产，编辑器开着会冲突；关闭时不要保存本素材的资产）。
+
+## UE 编辑器插件（「AI 动捕」菜单）
+
+安装一次：`python -m aimocap install-ue-plugin`（把 `ue_plugin/AIMocap` 以目录链接装进工程的 Plugins，并在 .uproject 里启用）。重新打开工程后，主菜单栏出现「AI 动捕」：
+
+- **新建动捕…**：填素材名，选已有视频（或编排提示词 + 构图板），选画面左右两人各用哪个 MetaHuman 蓝图 → 后台解算（5–8 分钟，编辑器可以照常用，进度在 Output Log 搜「AI 动捕」）→ 完成后自动在编辑器里重定向，建素材专用关卡和序列，弹出质检摘要
+- **用提示词生成时会先弹窗**，显示预估积分和当前余额，点「是」才会提交
+- **出构图板候选（免费）…**：即梦文生图出几张候选，完成后打开所在文件夹
+- **换角色 / 重做重定向…**：已解算的素材换 MetaHuman，只重做 UE 部分（几十秒）
+- **任务状态 / 打开质检报告 / 打开工作目录 / 打开配置文件**
+
+插件是纯 Python（UE 5.8 自带 Python 插件），界面用 UE 的属性面板对话框。重活由系统 Python 跑本工具的命令行，UE 阶段在编辑器里运行（与命令行共用 `scripts/ue/ue_pipeline.py`）。
+
+**每段素材一个专用关卡** `/Game/AIMocap/<素材>/L_<素材>`：两个完整的 MetaHuman 蓝图放在关卡里，序列绑定它们的 Body 组件（头、衣服、头发都在），不会动你正在编辑的关卡。
 
 ## 阶段
 
@@ -32,7 +47,7 @@ python -m aimocap test                    # 回归测试
 | clean | Windows | 脚部锁定：每人贴地、着地检测并合并碎片、根部水平校正、腿部 IK | `clean/p*.npz`、`cleanup.json` |
 | preview | Blender 4.5 | SMPL-X 场景 + 原机位/3/4 机位渲染 + 三联画 | `blender/preview.blend`、`triptych.mp4` |
 | fbx | Blender 4.5 | UE 骨骼命名、厘米、Z 朝上的 FBX | `fbx/p*.fbx` |
-| ue | UE 5.8 命令行 | 导入 → IK Rig → 重定向到 MetaHuman → 关卡序列 → 度量 | UE 里 `/Game/AIMocap/<素材>/`，`ue/result.json` |
+| ue | UE 5.8（命令行或编辑器插件） | 导入 → IK Rig → 重定向到 MetaHuman → 专用关卡 + 完整 MetaHuman + 序列 → 度量 | UE 里 `/Game/AIMocap/<素材>/`，`ue/result.json` |
 | qc | Windows | 质检报告 | `qc/report.html`、`metrics.json` |
 
 每个阶段记录参数指纹（`state.json`），输入和参数没变就跳过；上游重跑后下游自动失效。
@@ -58,7 +73,6 @@ python -m aimocap test                    # 回归测试
 ## 已知限制
 
 - **没有手指**：GVHMR 只出身体 21 个关节，MetaHuman 手是平掌
-- **序列里是无头的身体网格**：命令行模式拿不到 MetaHuman 蓝图的 Body 组件。要完整角色，在 Sequencer 里把 `BP_<角色>` 拖进去，在它的 Body 组件上加动画轨道，选 `MH_p*_Anim`
 - Seedance 在快速肢体交错时会形变，没有技术对策，一条编排多生成几版挑干净的
 - 720p 的积分单价未实测，是估算值
 
@@ -81,6 +95,8 @@ python -m aimocap test                    # 回归测试
 - **UE 只按比例缩放骨盆的垂直运动，水平原样传递**：所以需要统一水平缩放
 - 同名资产删除后立刻 `create_asset` 返回 None：已存在的资产一律加载后重新配置
 - 命令行模式无渲染：不能导出带网格的 FBX
+- 序列用 spawnable 模板绑定 MetaHuman 拿不到蓝图组件（Body/Face 是构造时才生成的）→ 改为把角色放进专用关卡再 possessable 绑定
+- UE 内置 Python 没有 numpy：插件不 import 本工具，而是调用系统 Python 的命令行（清掉 PYTHONHOME/PYTHONPATH）
 - Blender 的 Python 出错时退出码仍为 0：所有调用都加了 `--python-exit-code 1`
 - 通过 Python subprocess 调用 wsl.exe，不经过 Git Bash，避免了路径改写和多行脚本 CR 问题
 - SMPL/SMPL-X 为非商用研究许可，仅限个人使用

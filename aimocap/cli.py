@@ -6,9 +6,12 @@
   python -m aimocap run   <素材> [--from 阶段] [--to 阶段] [--only 阶段] [--force]
   python -m aimocap status <素材>
   python -m aimocap test  [--update]                          回归测试
+  python -m aimocap install-ue-plugin                          把编辑器插件链接进 UE 工程
+（插件内部用：quote / uejob / mark）
 阶段顺序：generate → solve → clean → preview → fbx → ue → qc
 """
 import argparse
+import json
 import shutil
 import sys
 import time
@@ -17,7 +20,7 @@ from pathlib import Path
 from . import config as C
 from .state import Clip, State
 from .stages import clean, fbx, generate, preview, qc, solve, ue
-from .util import log, params_hash
+from .util import load_json, log, params_hash
 
 STAGES = [("generate", generate), ("solve", solve), ("clean", clean), ("preview", preview),
           ("fbx", fbx), ("ue", ue), ("qc", qc)]
@@ -65,6 +68,17 @@ def run_stages(cfg, clip_name, frm=None, to=None, only=None, force=False, args=N
     return c
 
 
+def mark_done(cfg, clip_name, stage, info=None):
+    """外部（编辑器插件）完成了某阶段时登记到 state.json，参数指纹与 run 的算法一致。"""
+    c = Clip(cfg, clip_name)
+    st = State(c)
+    i = NAMES.index(stage)
+    mod = dict(STAGES)[stage]
+    p = mod.params(c, cfg)
+    p["_upstream"] = st.hash_of(NAMES[i - 1]) if i > 0 else ""
+    st.mark(stage, params_hash(p), mod.outputs(c, cfg), info or {})
+
+
 def cmd_status(cfg, a):
     c = Clip(cfg, a.clip)
     st = State(c)
@@ -97,8 +111,19 @@ def main(argv=None):
     s.add_argument("--only", choices=NAMES)
     s.add_argument("--force", action="store_true")
     s.add_argument("--regen", action="store_true", help="已有视频也重新生成（会花积分）")
+    s.add_argument("--allow-spend", action="store_true", help="允许花积分生成视频")
+    s.add_argument("--no-preview", action="store_true", help="跳过 Blender 预览")
     s = sub.add_parser("status")
     s.add_argument("clip")
+    s = sub.add_parser("quote")
+    s.add_argument("--resolution")
+    s.add_argument("--duration", type=int)
+    s = sub.add_parser("uejob")
+    s.add_argument("clip")
+    s = sub.add_parser("mark")
+    s.add_argument("clip")
+    s.add_argument("stage", choices=NAMES)
+    s = sub.add_parser("install-ue-plugin")
     s = sub.add_parser("test")
     s.add_argument("--update", action="store_true")
     a = ap.parse_args(argv)
@@ -108,9 +133,22 @@ def main(argv=None):
     elif a.cmd == "plate":
         generate.make_plates(Clip(cfg, a.clip), cfg, Path(a.prompt), a.n, a.ratio)
     elif a.cmd == "run":
+        if a.no_preview:
+            cfg["preview"]["enabled"] = False
         run_stages(cfg, a.clip, a.frm, a.to, a.only, a.force, a)
     elif a.cmd == "status":
         cmd_status(cfg, a)
+    elif a.cmd == "quote":
+        print(json.dumps({"estimate": generate.estimate(cfg, a.resolution, a.duration), "balance": generate.credits(cfg),
+                          "max_credits": cfg["generate"]["max_credits"]}, ensure_ascii=False))
+    elif a.cmd == "uejob":
+        print(json.dumps(ue.build_job(Clip(cfg, a.clip), cfg), ensure_ascii=False))
+    elif a.cmd == "mark":
+        mark_done(cfg, a.clip, a.stage, load_json(Clip(cfg, a.clip).ue / "result.json") if a.stage == "ue" else None)
+        log(f"已登记 {a.clip} 的 {a.stage} 阶段")
+    elif a.cmd == "install-ue-plugin":
+        from .install import install_ue_plugin
+        install_ue_plugin(cfg)
     elif a.cmd == "test":
         from .regression import run_tests
         sys.exit(run_tests(cfg, a.update))
