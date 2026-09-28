@@ -34,9 +34,20 @@ def _cli(cfg, args, logfile=None):
     return extract_json(out) or {}, out
 
 
-def credits(cfg):
-    j, _ = _cli(cfg, ["user_credit"])
-    return j.get("total_credit")
+NOT_LOGGED_IN = "未检测到有效登录态"
+
+
+def credits(cfg, tries=4, wait=5):
+    """查余额。读不到登录状态时等几秒重试：另一个进程（比如 OpenMontage）同时刷新 OAuth 令牌时，
+    会偶发读到失效状态（2026-09-28 实测：从 UE 启动时失败，一分钟后同样环境正常）。"""
+    for i in range(tries):
+        j, out = _cli(cfg, ["user_credit"])
+        if j.get("total_credit") is not None:
+            return j["total_credit"]
+        if i < tries - 1:
+            log(f"读不到即梦登录状态，{wait}s 后重试（{i + 1}/{tries - 1}）：{out.strip()[:60]}")
+            time.sleep(wait)
+    return None
 
 
 def _poll(cfg, sid, logdir, timeout=1800):
@@ -68,6 +79,9 @@ def run_(c, cfg, args):
     if not getattr(args, "allow_spend", False):
         raise SystemExit(f"生成视频要花约 {est} 积分（余额 {credits(cfg)}）。确认后加 --allow-spend 重跑")
     before = credits(cfg)
+    if before is None:
+        raise SystemExit("反复读不到即梦的登录状态，未提交任何任务（没有扣费）。稍后重试；"
+                         "仍然不行就在终端运行 dreamina login 重新登录")
     log(f"生成视频：{g['model']} {g['resolution']} {g['duration']}s，预估 {est} 积分，当前余额 {before}")
     prompt = c.prompt.read_text(encoding="utf-8").strip()
     last = None

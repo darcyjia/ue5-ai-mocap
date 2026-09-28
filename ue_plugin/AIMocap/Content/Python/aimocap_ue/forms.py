@@ -24,40 +24,42 @@ RES_NAME = {0: "480p", 1: "720p", 2: "1080p"}
 
 @unreal.uclass()
 class AIMocapNewJob(unreal.Object):
-    clip_name = unreal.uproperty(str, meta={"Category": "1 素材", "DisplayName": "素材名",
-                                            "ToolTip": "英文、数字、下划线。工作目录和 UE 资产都用这个名字"})
-    source = unreal.uproperty(AIMocapSource, meta={"Category": "1 素材", "DisplayName": "来源"})
-    video = unreal.uproperty(unreal.FilePath, meta={"Category": "2 已有视频", "DisplayName": "视频文件",
-                                                    "FilePathFilter": "mp4", "ToolTip": "来源选「已有视频」时填"})
-    prompt_file = unreal.uproperty(unreal.FilePath, meta={"Category": "3 用提示词生成", "DisplayName": "编排提示词（txt）",
-                                                          "FilePathFilter": "txt"})
+    # 注意：UE 属性面板按声明的【逆序】显示，所以这里从 5 写到 1
+    blender_preview = unreal.uproperty(bool, meta={"Category": "5 选项", "DisplayName": "生成 Blender 预览三联画",
+                                                   "ToolTip": "多约 3 分钟；质检报告里会带这段视频"})
+    right_character = unreal.uproperty(unreal.Blueprint, meta={"Category": "4 角色", "DisplayName": "画面右边的人"})
+    left_character = unreal.uproperty(unreal.Blueprint, meta={"Category": "4 角色", "DisplayName": "画面左边的人",
+                                                              "ToolTip": "MetaHuman 蓝图（BP_xxx）"})
+    duration = unreal.uproperty(int, meta={"Category": "3 用提示词生成", "DisplayName": "时长（秒）",
+                                           "ClampMin": "4", "ClampMax": "30"})
+    resolution = unreal.uproperty(AIMocapResolution, meta={"Category": "3 用提示词生成", "DisplayName": "分辨率"})
     plate_image = unreal.uproperty(unreal.FilePath, meta={"Category": "3 用提示词生成", "DisplayName": "构图板图片",
                                                           "FilePathFilter": "jpg",
                                                           "ToolTip": "锁定机位和构图的首帧；可先用「出构图板候选」免费生成"})
-    resolution = unreal.uproperty(AIMocapResolution, meta={"Category": "3 用提示词生成", "DisplayName": "分辨率"})
-    duration = unreal.uproperty(int, meta={"Category": "3 用提示词生成", "DisplayName": "时长（秒）",
-                                           "ClampMin": "4", "ClampMax": "30"})
-    left_character = unreal.uproperty(unreal.Blueprint, meta={"Category": "4 角色", "DisplayName": "画面左边的人",
-                                                              "ToolTip": "MetaHuman 蓝图（BP_xxx）"})
-    right_character = unreal.uproperty(unreal.Blueprint, meta={"Category": "4 角色", "DisplayName": "画面右边的人"})
-    blender_preview = unreal.uproperty(bool, meta={"Category": "5 选项", "DisplayName": "生成 Blender 预览三联画",
-                                                   "ToolTip": "多约 3 分钟；质检报告里会带这段视频"})
+    prompt_file = unreal.uproperty(unreal.FilePath, meta={"Category": "3 用提示词生成", "DisplayName": "编排提示词（txt）",
+                                                          "FilePathFilter": "txt"})
+    video = unreal.uproperty(unreal.FilePath, meta={"Category": "2 已有视频", "DisplayName": "视频文件",
+                                                    "FilePathFilter": "mp4", "ToolTip": "来源选「已有视频」时填"})
+    source = unreal.uproperty(AIMocapSource, meta={"Category": "1 素材", "DisplayName": "来源"})
+    clip_name = unreal.uproperty(str, meta={"Category": "1 素材", "DisplayName": "素材名",
+                                            "ToolTip": "英文、数字、下划线。工作目录和 UE 资产都用这个名字"})
 
 
 @unreal.uclass()
 class AIMocapRedo(unreal.Object):
+    # 逆序声明（UE 属性面板倒着显示）
+    right_character = unreal.uproperty(unreal.Blueprint, meta={"Category": "角色", "DisplayName": "画面右边的人"})
+    left_character = unreal.uproperty(unreal.Blueprint, meta={"Category": "角色", "DisplayName": "画面左边的人"})
     clip_folder = unreal.uproperty(unreal.DirectoryPath, meta={"Category": "素材", "DisplayName": "素材目录",
                                                                "ToolTip": "aimocap_work 下的某个素材文件夹"})
-    left_character = unreal.uproperty(unreal.Blueprint, meta={"Category": "角色", "DisplayName": "画面左边的人"})
-    right_character = unreal.uproperty(unreal.Blueprint, meta={"Category": "角色", "DisplayName": "画面右边的人"})
 
 
 @unreal.uclass()
 class AIMocapPlates(unreal.Object):
-    clip_name = unreal.uproperty(str, meta={"Category": "构图板", "DisplayName": "素材名"})
+    count = unreal.uproperty(int, meta={"Category": "构图板", "DisplayName": "张数", "ClampMin": "1", "ClampMax": "10"})
     prompt_file = unreal.uproperty(unreal.FilePath, meta={"Category": "构图板", "DisplayName": "构图板提示词（txt）",
                                                           "FilePathFilter": "txt"})
-    count = unreal.uproperty(int, meta={"Category": "构图板", "DisplayName": "张数", "ClampMin": "1", "ClampMax": "10"})
+    clip_name = unreal.uproperty(str, meta={"Category": "构图板", "DisplayName": "素材名"})
 
 
 @unreal.uclass()
