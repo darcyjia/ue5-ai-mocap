@@ -62,6 +62,15 @@ python -m aimocap test                    # 回归测试
 - Seedance 在快速肢体交错时会形变，没有技术对策，一条编排多生成几版挑干净的
 - 720p 的积分单价未实测，是估算值
 
+## 版本管理
+
+- 仓库：https://github.com/darcyjia/aimocap（私有），默认分支 `main`
+- 新克隆后执行一次 `git config core.hooksPath hooks`，启用推送前的回归测试钩子
+- 日常：改代码 → `python -m aimocap test` → 提交 → `git push`（钩子会再跑一次测试，指标变差会拒绝推送）
+- 大改动或试验性改动开分支：`git switch -c 试验名`，验证通过再合回 `main`
+- 发版：更新 `CHANGELOG.md`，然后 `git tag -a vX.Y.Z -m "说明" && git push origin vX.Y.Z`
+- 基准素材的中间产物（`aimocap_work/`）不进仓库，只登记指标在 `tests/golden.json`
+
 ## 踩过的坑（代码里已处理，改代码时别退回去）
 
 - **重定向姿态只对齐手臂/手指**。`auto_align_all_bones` 会让 MetaHuman 驼背约 30°、低头约 55°
