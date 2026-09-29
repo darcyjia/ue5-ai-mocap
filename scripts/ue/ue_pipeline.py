@@ -8,7 +8,7 @@ Body 组件。这样头、衣服、头发都在（模板式 spawnable 拿不到�
 - 重定向姿态只对齐手臂/手指；auto_align_all_bones 会让 MetaHuman 驼背 ~30°、低头 ~55°。
 - UE 只按比例缩放骨盆的垂直运动，水平原样传递 → 统一的 scale_horizontal 让步幅匹配目标角色腿长。
 - 同名资产删除后立刻 create_asset 会返回 None → 已存在就加载后重新配置，不删。
-- 命令行无渲染：不能导出带网格的 FBX。
+- 命令行无渲染：不能导出带网格的 FBX；也不能加面部控制板轨道（Control Rig 编辑器要 Slate，会断言崩溃）→ 表情只在编辑器插件里加。
 - 对已存在的骨骼网格再导入同一个 FBX，UE 走 atomic reimport：只重导网格，**不重导动画**，
   会一直用第一次导入的旧动作 → 源资产按 FBX 指纹放进新目录 src/p<k>_<指纹>，用完删掉旧目录。"""
 import json
@@ -135,6 +135,34 @@ def body_component(actor):
     comps = actor.get_components_by_class(unreal.SkeletalMeshComponent)
     return next((c for c in comps if c.get_name().lower() == "body"), None) or \
         next((c for c in comps if "body" in c.get_name().lower()), None)
+
+
+def face_component(actor):
+    comps = actor.get_components_by_class(unreal.SkeletalMeshComponent)
+    return (next((c for c in comps if c.get_name().lower() == "face"), None)
+            or next((c for c in comps if "face" in c.get_name().lower()), None))
+
+
+def add_face_track(seq, binding, face, data, log):
+    """表情：在 Face 组件上挂它的面部控制板（MetaHuman 的 Face_ControlBoard_CtrlRig），整条曲线写进控件。"""
+    lib = unreal.ControlRigSequencerLibrary
+    rig_bp = face.get_skeletal_mesh_asset().get_editor_property("default_animating_rig")
+    if rig_bp is None:
+        log("face: no default animating rig, skipped")
+        return 0
+    world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
+    track = lib.find_or_create_control_rig_track(world, seq, rig_bp.generated_class(), binding)
+    rig = next((x.control_rig for x in lib.get_control_rigs(seq) if x.track == track), None)
+    if rig is None:
+        log("face: control rig not found on track, skipped")
+        return 0
+    n = int(data["frames"])
+    frames = [unreal.FrameNumber(i) for i in range(n)]
+    for name, vals in data["float"].items():
+        lib.set_local_control_rig_floats(seq, rig, name, frames, [float(v) for v in vals])
+    for name, vv in data["vec2"].items():
+        lib.set_local_control_rig_vector2_ds(seq, rig, name, frames, [unreal.Vector2D(float(a), float(b)) for a, b in vv])
+    return len(data["float"]) + len(data["vec2"])
 
 
 def spawn_character(person, k):
@@ -280,7 +308,7 @@ def measure(people, kh):
     return res
 
 
-def build_sequence(job, people, nf, sound=None):
+def build_sequence(job, people, nf, sound=None, log=_log):
     seq, created = load_or_create(f"{job['content_dir']}/LS_{job['clip']}", unreal.LevelSequence,
                                   unreal.LevelSequenceFactoryNew())
     if not created:
@@ -302,6 +330,12 @@ def build_sequence(job, people, nf, sound=None):
         prm = sec.get_editor_property("params")
         prm.set_editor_property("animation", p["mh_anim"])
         sec.set_editor_property("params", prm)
+        fdata = None if job.get("headless") else (job.get("face") or [None] * len(people))[people.index(p)]
+        face = face_component(p["actor"]) if fdata else None
+        if face is not None:
+            fb = seq.add_possessable(face)
+            nch = add_face_track(seq, fb, face, json.load(open(fdata, encoding="utf-8")), log)
+            log(f"face p{people.index(p)}: {nch} channels")
     if sound:                                       # 原声从第 0 帧开始，不变速（动画与视频逐帧对应）
         at = (getattr(seq, "add_track", None) or getattr(seq, "add_master_track"))(unreal.MovieSceneAudioTrack)
         at.set_display_name("原声")
@@ -375,7 +409,9 @@ def run_job(job, log=_log, step=lambda msg: None):
     step("关卡序列")
     sound = import_audio(job["audio"], audio_dest(cd, job["audio"])) if job.get("audio") else None
     log("audio", sound.get_path_name() if sound else None)
-    seq = build_sequence(job, people, res["frames"], sound)
+    seq = build_sequence(job, people, res["frames"], sound, log)
+    if job.get("headless") and any(job.get("face") or []):
+        log("face: skipped in command-line mode; use the editor plugin (AI 动捕) to add facial animation")
     res["audio"] = sound.get_path_name() if sound else None
     les.save_current_level()
     res["sequence"] = seq.get_path_name()

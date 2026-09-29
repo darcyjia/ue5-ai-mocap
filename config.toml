@@ -72,6 +72,26 @@ chest = 4.0
 belly = 4.0
 arm = 10.0
 
+[face]
+# 表情：不还原视频里的脸，由动作驱动（眼神盯对手、眨眼、受击表情），写进 MetaHuman 面部控制板。
+enabled = true
+style_strength = 1.0     # 性格底色强度（[[person]] 的 face_style：calm 冷静 / fierce 狰狞）
+hit_strength = 1.0       # 受击表情强度（跟 impact 的冲击幅度走，格挡时再减弱）
+hit_tau = 0.05           # 受击表情到峰值的时间(s)
+hit_duration = 0.45      # 受击表情持续(s)
+eye_max_yaw = 35.0       # 眼球左右最大转角(°)，超出时眼球顶到边
+eye_max_pitch = 25.0
+gaze_x_sign = 1.0        # 眼球方向和控制板的正负对应；在 UE 里看到眼睛往反方向看就改成 -1
+gaze_y_sign = 1.0
+gaze_gain = [0.5, 0.7]   # 眼球只转"应转角度"的这个比例（左右, 上下）：双人相对纵深估不准，完全对准会过度转眼
+gaze_limit = 0.6         # 眼球控件最大值（1 = 转到头；太大会长时间斜眼）
+saccade_interval = [0.4, 1.5]   # 扫视：每隔这么久(s)眼神轻微跳一下
+saccade_amp = 0.06
+
+[face.blink_interval]    # 眨眼间隔(s)，按性格
+calm = [1.5, 4.0]
+fierce = [2.5, 5.0]
+
 [preview]
 enabled = true
 
@@ -87,10 +107,12 @@ force_horizontal_scale = 0                    # >0 时强制使用这个水平�
 [[person]]
 name = "left"
 mh_bp = "/Game/MetaHumans/NewMetaHumanCharacter/BP_NewMetaHumanCharacter"
+face_style = "calm"      # 表情性格：calm 冷静（主角）/ fierce 狰狞（反派）
 
 [[person]]
 name = "right"
 mh_bp = "/Game/MetaHumans/NewMetaHumanCharacter/BP_NewMetaHumanCharacter"
+face_style = "fierce"
 
 [qc]
 min_track_coverage = 0.95

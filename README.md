@@ -53,6 +53,7 @@ python -m aimocap test                    # 回归测试
 | clean | Windows | 脚部锁定：每人贴地、着地检测并合并碎片、根部水平校正、腿部 IK | `clean/p*.npz`、`cleanup.json` |
 | hands | Windows / `.venv-tools`（MediaPipe） | 识别四指弯曲 → 拳 / 半握 / 掌，平滑后把预设手型套到手指关节；`input/hands.json` 手动覆盖 | `hands/p*.npz`、`hands.json`、`timeline.png` |
 | impact | Windows | 受力反馈：检测打击，给被打方叠加短促冲击；躯干高频按视频校准放大；`input/impacts.json` 手动增删调 | `impact/p*.npz`、`impacts.json`、`timeline.png` |
+| face | Windows | 表情：眼神盯对手、眨眼、受击表情、性格底色 → MetaHuman 面部控制板控件曲线（UE 端只在编辑器插件里写入序列） | `face/face_p*.json`、`face.json`、`timeline.png` |
 | preview | Blender 4.5 | SMPL-X 场景 + 原机位/3/4 机位渲染 + 三联画 | `blender/preview.blend`、`triptych.mp4` |
 | fbx | Blender 4.5 | UE 骨骼命名、厘米、Z 朝上的 FBX | `fbx/p*.fbx` |
 | ue | UE 5.8（命令行或编辑器插件） | 导入 → IK Rig → 重定向到 MetaHuman → 专用关卡 + 完整 MetaHuman + 序列 → 度量 | UE 里 `/Game/AIMocap/<素材>/`，`ue/result.json` |
@@ -68,6 +69,7 @@ python -m aimocap test                    # 回归测试
 - `[ue] uniform_horizontal_scale`：两人使用统一的水平缩放（= 两人"目标骨盆高 / 源骨盆高"的平均），让步幅匹配目标角色的腿长，同时保持两人相对位置
 - `[hands]`：手型识别阈值（弯曲角 ≥110° 拳、<55° 掌）、平滑、识别不到时的兜底；`enabled = false` 恢复平伸手
 - `[impact]`：打击检测门槛（各打击点最低速度、骤停比例、接触距离）、各部位冲击幅度 `amp_deg`、冲击快慢 `tau`；`enabled = false` 关闭
+- `[face]`：表情强度、眨眼间隔、眼神转动比例 `gaze_gain` / 上限 `gaze_limit`、方向正负 `gaze_x_sign`（UE 里眼睛看反了就改 -1）；`[[person]] face_style` 设性格
 - `[qc]`：质检阈值
 - 临时覆盖写在 `config.local.toml`（不进 git）
 

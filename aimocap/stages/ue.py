@@ -19,6 +19,7 @@ def persons(c, cfg):
 def params(c, cfg):
     n = cfg["solve"]["num_people"]
     return {"in": [file_sig(c.fbx / f"p{k}.fbx") for k in range(n)], "video": file_sig(c.video),
+            "face": [file_sig(c.face / f"face_p{k}.json") for k in range(n)],
             "ue": cfg["ue"], "person": persons(c, cfg),
             "script": [file_sig(SCRIPTS / "ue" / f) for f in ("ue_pipeline.py", "ue_commandlet.py")]}
 
@@ -63,6 +64,7 @@ def build_job(c, cfg):
            "force_horizontal_scale": cfg["ue"].get("force_horizontal_scale", 0),
            "fps": cam["fps"], "cam_ue": camera_ue(cam), "lens": cam["lens"], "res": cam["res"],
            "audio": extract_audio(c, cfg),
+           "face": [str(c.face / f"face_p{k}.json") if (c.face / f"face_p{k}.json").exists() else None for k in range(n)],
            "export_dir": str(c.ue / "export"), "result": str(c.ue / "result.json")}
     save_json(c.ue / "job.json", job)
     return job
