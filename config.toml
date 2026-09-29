@@ -46,6 +46,32 @@ vote = 7                 # 多帧投票窗口
 min_segment = 5          # 手型片段最短帧数
 blend = 5                # 手型切换的过渡帧数
 
+[impact]
+# 受力反馈：GVHMR 会把受击时短促的晃动压小，这里补回来。
+enabled = true
+hf_gain = "auto"         # 躯干/脖子/头 快速变化部分的放大倍数；auto = 按视频校准（视频/动捕 的头部高频比）
+hf_gain_max = 2.5
+hf_sigma = 3             # 区分"快/慢"的平滑宽度（帧）
+stop_frames = 6          # 打击判定：速度峰值后这么多帧内……
+stop_ratio = 0.45        # ……降到峰值的这个比例以下（打中/被挡），挥空穿过去的不算
+contact_dist = 0.15      # 且打击点离对方部位表面 < 这个距离(m)（双人相对位置有几厘米误差，放宽些）
+merge_frames = 3         # 同一人这么多帧内的多次打击只算最快的一下
+ref_speed = 3.0          # 幅度按 来拳速度/ref_speed 缩放（0.5–1.6 倍）
+tau = 0.06               # 冲击到峰值的时间(s)，越小越"脆"
+duration = 0.3           # 冲击持续(s)
+
+[impact.min_speed]       # 各打击点的最低速度 m/s（GVHMR 会把快拳压慢，实测连环冲拳只有 2–3 m/s）
+fist = 1.8
+elbow = 2.0
+foot = 3.0
+knee = 2.0
+
+[impact.amp_deg]         # 各受击部位的基准幅度（度）
+head = 7.0
+chest = 4.0
+belly = 4.0
+arm = 10.0
+
 [preview]
 enabled = true
 

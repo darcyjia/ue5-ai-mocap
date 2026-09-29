@@ -8,7 +8,7 @@ B = SCRIPTS / "blender"
 
 def params(c, cfg):
     n = cfg["solve"]["num_people"]
-    return {"in": [file_sig(c.hands / f"p{k}.npz") for k in range(n)],
+    return {"in": [file_sig(c.impact / f"p{k}.npz") for k in range(n)],
             "scripts": [file_sig(B / s) for s in ("build_blend.py", "render_preview.py", "common.py")]}
 
 
@@ -20,7 +20,7 @@ def run_(c, cfg):
     bl = cfg["paths"]["blender"]
     blend = c.blender / "preview.blend"
     sh([bl, "-b", "--factory-startup", "--python-exit-code", "1", "--python", B / "build_blend.py", "--",
-         "--npz-dir", c.hands, "--out", blend], c.logs / "preview_build.log")
+         "--npz-dir", c.impact, "--out", blend], c.logs / "preview_build.log")
     for sub in ("anim_orig", "anim_side"):
         shutil.rmtree(c.blender / sub, ignore_errors=True)
     sh([bl, "-b", blend, "--python-exit-code", "1", "--python", B / "render_preview.py", "--", "--out-dir", c.blender],

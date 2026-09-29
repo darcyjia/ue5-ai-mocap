@@ -4,7 +4,7 @@ from ..util import SCRIPTS, file_sig, run as sh
 
 def params(c, cfg):
     n = cfg["solve"]["num_people"]
-    return {"in": [file_sig(c.hands / f"p{k}.npz") for k in range(n)],
+    return {"in": [file_sig(c.impact / f"p{k}.npz") for k in range(n)],
             "script": file_sig(SCRIPTS / "blender" / "export_fbx.py")}
 
 
@@ -14,6 +14,6 @@ def outputs(c, cfg):
 
 def run(c, cfg, args):
     _, out = sh([cfg["paths"]["blender"], "-b", "--factory-startup", "--python-exit-code", "1", "--python",
-                 SCRIPTS / "blender" / "export_fbx.py", "--", "--npz-dir", c.hands, "--out-dir", c.fbx],
+                 SCRIPTS / "blender" / "export_fbx.py", "--", "--npz-dir", c.impact, "--out-dir", c.fbx],
                 c.logs / "fbx.log")
     return {"exported": [l.split("@@ ")[1] for l in out.splitlines() if "@@ exported" in l]}
