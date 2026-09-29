@@ -12,7 +12,7 @@
 - 新命令：`install-ue-plugin`、`quote`、`uejob`、`mark`；`run --no-preview`
 - `ue_pipeline.py` 重构为 `run_job()`，命令行入口 `ue_commandlet.py`
 - **手型**：新阶段 hands（clean 与 preview 之间）。MediaPipe 识别四指弯曲 → 拳 / 半握 / 掌，平滑后套预设到 SMPL-X 手指关节；识别不到按前后手型和出拳动作兜底；`input/hands.json` 手动覆盖；质检报告加手型时间线和识别抽样。测试素材识别率 75–93%
-- 插件新增「手型修正…」「查看手型识别…」
+- 插件新增「手型修正…」「查看手型识别…」「受力修正…」「查看受力检测…」；质检报告加受力时间线
 - preview / fbx 改读 `hands/`；FBX 导出全部 55 个关节（原来只有身体 22 个）
 - **受力反馈**：新阶段 impact（hands 之后）。GVHMR 会把连环小击打的受击晃动抹平（fight_test_03 冲拳段头部晃动 1.40 → 0.58 px），从动捕里检测打击（拳/肘/脚/膝高速到达对方部位并骤停），给被打方叠加临界阻尼冲击（头/胸/腹/格挡手臂各自的关节分配），另有按视频校准的躯干高频放大；`input/impacts.json` 手动增删调；时间线 `impact/timeline.png`。preview / fbx 改读 `impact/`
 - **原声**：ue 阶段把视频的声音导成 `ue/audio.wav`（48kHz），导入 UE 放进序列第 0 帧的「原声」音轨。动画与视频逐帧对应、同为 24fps，声音不变速（倍数 1.0）

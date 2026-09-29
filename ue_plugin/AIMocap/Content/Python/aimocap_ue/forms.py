@@ -101,6 +101,42 @@ class AIMocapHandFix(unreal.Object):
     clip_folder = unreal.uproperty(unreal.DirectoryPath, meta={"Category": "1 素材", "DisplayName": "素材目录"})
 
 
+@unreal.uenum()
+class AIMocapImpactAction(unreal.EnumBase):
+    SCALE = unreal.uvalue(0, meta={"DisplayName": "调幅度（这个时间点附近自动检测到的那一下）"})
+    REMOVE = unreal.uvalue(1, meta={"DisplayName": "删掉这一下"})
+    ADD = unreal.uvalue(2, meta={"DisplayName": "新增一下（自动检测漏掉的）"})
+
+
+@unreal.uenum()
+class AIMocapImpactTarget(unreal.EnumBase):
+    AUTO = unreal.uvalue(0, meta={"DisplayName": "不改（新增时默认打头）"})
+    HEAD = unreal.uvalue(1, meta={"DisplayName": "头"})
+    CHEST = unreal.uvalue(2, meta={"DisplayName": "胸（往后仰）"})
+    BELLY = unreal.uvalue(3, meta={"DisplayName": "腹（往前折）"})
+    ARM_L = unreal.uvalue(4, meta={"DisplayName": "左臂格挡"})
+    ARM_R = unreal.uvalue(5, meta={"DisplayName": "右臂格挡"})
+
+
+IMPACT_ACTION = {0: "scale", 1: "remove", 2: "add"}
+IMPACT_TARGET = {0: None, 1: "head", 2: "chest", 3: "belly", 4: "armL", 5: "armR"}
+
+
+@unreal.uclass()
+class AIMocapImpactFix(unreal.Object):
+    # 逆序声明（UE 属性面板倒着显示）
+    clear_all = unreal.uproperty(bool, meta={"Category": "3 其它", "DisplayName": "先清空这个素材已有的受力修正"})
+    target = unreal.uproperty(AIMocapImpactTarget, meta={"Category": "2 修正", "DisplayName": "打在哪"})
+    scale = unreal.uproperty(float, meta={"Category": "2 修正", "DisplayName": "幅度倍数",
+                                          "ClampMin": "0", "ClampMax": "4",
+                                          "ToolTip": "1 = 默认；2 = 两倍；0.5 = 减半。删除时忽略"})
+    action = unreal.uproperty(AIMocapImpactAction, meta={"Category": "2 修正", "DisplayName": "操作"})
+    time_sec = unreal.uproperty(float, meta={"Category": "2 修正", "DisplayName": "时间（秒）", "ClampMin": "0",
+                                             "ToolTip": "关卡序列里的时间；前后 3 帧内的那一下都算。受力时间线图上能看到每一下的位置"})
+    person = unreal.uproperty(AIMocapPerson, meta={"Category": "2 修正", "DisplayName": "被打的人"})
+    clip_folder = unreal.uproperty(unreal.DirectoryPath, meta={"Category": "1 素材", "DisplayName": "素材目录"})
+
+
 @unreal.uclass()
 class AIMocapPickClip(unreal.Object):
     clip_folder = unreal.uproperty(unreal.DirectoryPath, meta={"Category": "素材", "DisplayName": "素材目录"})

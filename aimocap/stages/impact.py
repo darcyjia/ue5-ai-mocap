@@ -180,13 +180,14 @@ def react(Rl, Rg, pos, parents, e, h, fps):
 
 def overrides(c, events):
     """input/impacts.json（p 是被打的人）：
-    {"p":1,"frame":130,"scale":1.5}          调这一下的幅度（±3 帧内的自动检测结果）
+    {"p":1,"frame":130,"scale":1.5}          调这一下的幅度（±3 帧内离得最近的那个自动检测结果）
     {"p":1,"frame":130,"remove":true}         删掉
     {"p":1,"frame":130,"target":"head"}       附近没有检测结果时新增一下（target: head/chest/belly/armL/armR）"""
     ov = load_json(c.input / "impacts.json", []) or []
     for o in ov:
         k, f = int(o["p"]), int(o["frame"])
-        near = [e for e in events[k] if abs(e["frame"] - f) <= 3]
+        cand = [e for e in events[k] if abs(e["frame"] - f) <= 3]
+        near = [min(cand, key=lambda e: abs(e["frame"] - f))] if cand else []   # 只动离这个时间点最近的一下
         if o.get("remove"):
             events[k] = [e for e in events[k] if e not in near]
         elif near:

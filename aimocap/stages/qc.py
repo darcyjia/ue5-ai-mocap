@@ -23,7 +23,7 @@ plt.rcParams["axes.unicode_minus"] = False
 def params(c, cfg):
     n = cfg["solve"]["num_people"]
     return {"in": [file_sig(c.clean / f"p{k}.npz") for k in range(n)], "ue": file_sig(c.ue / "result.json"),
-            "hands": file_sig(c.hands / "hands.json"), "qc": cfg["qc"]}
+            "hands": file_sig(c.hands / "hands.json"), "impact": file_sig(c.impact / "impacts.json"), "qc": cfg["qc"]}
 
 
 def outputs(c, cfg):
@@ -156,6 +156,9 @@ def write_html(c, M, rows, ue_r):
                         for f in M["hands"].get("samples", []) if (c.hands / "crops" / f).exists())
         hands = (f"<h2>手型时间线</h2><p>不对可以写 input/hands.json 手动覆盖（插件：AI 动捕 → 手型修正…）</p>"
                  f"<img src='{rel(c.hands / 'timeline.png')}' width='100%'><h3>识别抽样（左上角数字为弯曲角）</h3>{crops}")
+    if (c.impact / "timeline.png").exists():
+        hands += (f"<h2>受力时间线</h2><p>竖线 = 检测到的一次打击（高度 = 冲击幅度°）；下方曲线对比视频 / 原动捕 / 处理后的头部晃动。"
+                  f"不对可以用插件「受力修正…」或写 input/impacts.json</p><img src='{rel(c.impact / 'timeline.png')}' width='100%'>")
     s = M["solve"]
     doc = f"""<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>{html.escape(c.name)} 质检</title>
 <style>body{{font-family:'Microsoft YaHei',sans-serif;max-width:1200px;margin:24px auto;padding:0 16px;color:#111}}

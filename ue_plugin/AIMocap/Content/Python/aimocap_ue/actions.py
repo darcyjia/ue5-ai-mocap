@@ -209,6 +209,53 @@ def hand_fix():
                     "后台重做手型和导出（约 20 秒，不重新识别），完成后自动重做重定向。")
 
 
+def impact_fix():
+    if not _guard():
+        return
+    last = forms.load_last()
+    f = unreal.new_object(forms.AIMocapImpactFix)
+    f.clip_folder = forms.dp(last.get("report_folder") or str(core.work_root()))
+    f.scale = 1.5
+    if not forms.show("AI 动捕：受力修正", f):
+        return
+    folder = Path(f.clip_folder.path)
+    forms.save_last({"report_folder": str(folder)})
+    cam = folder / "clean" / "camera.json"
+    if not cam.exists() or not (folder / "fbx" / "p0.fbx").exists():
+        return _msg("AI 动捕", f"{folder} 还没跑到导出阶段，不能修正受力。")
+    fps = json.loads(cam.read_text(encoding="utf-8"))["fps"]
+    act, tg = forms.IMPACT_ACTION[int(f.action)], forms.IMPACT_TARGET[int(f.target)]
+    fix = {"p": int(f.person), "frame": round(f.time_sec * fps)}
+    if act == "remove":
+        fix["remove"] = True
+    else:
+        fix["scale"] = round(float(f.scale), 2)
+        if tg or act == "add":
+            fix["target"] = tg or "head"
+    ij = folder / "input" / "impacts.json"
+    fixes = [] if f.clear_all or not ij.exists() else json.loads(ij.read_text(encoding="utf-8"))
+    fixes.append(fix)
+    ij.write_text(json.dumps(fixes, ensure_ascii=False, indent=1), encoding="utf-8")
+    clip = folder.name
+
+    def done(job, ok):
+        if not ok:
+            return _msg("AI 动捕：失败", "\n".join(job.lines[-20:]))
+        finish_in_editor(clip)
+    core.start(f"受力修正 {clip}", clip, ["run", clip, "--from", "impact", "--to", "fbx", "--no-preview"], done)
+    what = {"scale": f"幅度 ×{fix.get('scale')}", "remove": "删掉", "add": f"新增（{fix.get('target')}）"}[act]
+    _msg("AI 动捕", f"已记录修正（共 {len(fixes)} 条，存在 input/impacts.json）：\n"
+                    f"p{fix['p']} 第 {fix['frame']} 帧（{f.time_sec:.2f}s）{what}\n\n"
+                    "后台重做受力和导出（约 15 秒），完成后自动重做重定向。")
+
+
+def open_impacts():
+    folder = _pick_clip("AI 动捕：查看受力检测")
+    if folder:
+        tl = folder / "impact" / "timeline.png"
+        core.open_path(tl) if tl.exists() else _msg("AI 动捕", f"{tl} 不存在（这个素材还没跑受力阶段）。")
+
+
 def open_hands():
     folder = _pick_clip("AI 动捕：查看手型识别")
     if folder:
