@@ -70,6 +70,27 @@ def cleanup_sources(cd, keep, log):
             log("could not delete", d, ex)
 
 
+def audio_dest(cd, wav):
+    st = os.stat(wav)
+    return f"{cd}/src/audio_{st.st_size:x}{st.st_mtime_ns // 1000000 % (1 << 32):08x}"
+
+
+def import_audio(wav, dest):
+    """视频原声 → SoundWave。和 FBX 一样按指纹放新目录，避免再导入时沿用旧资产。"""
+    if EAL.does_directory_exist(dest):
+        s = [unreal.load_asset(x) for x in EAL.list_assets(dest, recursive=False)]
+        s = next((x for x in s if isinstance(x, unreal.SoundWave)), None)
+        if s:
+            return s
+    t = unreal.AssetImportTask()
+    for k, v in dict(filename=wav, destination_path=dest, destination_name="audio", automated=True,
+                     replace_existing=True, save=True).items():
+        t.set_editor_property(k, v)
+    _at().import_asset_tasks([t])
+    return next((a for a in (unreal.load_asset(x) for x in EAL.list_assets(dest, recursive=False))
+                 if isinstance(a, unreal.SoundWave)), None)
+
+
 def import_fbx(fbx, dest, fps):
     existing = [unreal.load_asset(x) for x in EAL.list_assets(dest, recursive=False)]         if EAL.does_directory_exist(dest) else []
     mesh = next((x for x in existing if isinstance(x, unreal.SkeletalMesh)), None)
@@ -259,7 +280,7 @@ def measure(people, kh):
     return res
 
 
-def build_sequence(job, people, nf):
+def build_sequence(job, people, nf, sound=None):
     seq, created = load_or_create(f"{job['content_dir']}/LS_{job['clip']}", unreal.LevelSequence,
                                   unreal.LevelSequenceFactoryNew())
     if not created:
@@ -281,6 +302,12 @@ def build_sequence(job, people, nf):
         prm = sec.get_editor_property("params")
         prm.set_editor_property("animation", p["mh_anim"])
         sec.set_editor_property("params", prm)
+    if sound:                                       # 原声从第 0 帧开始，不变速（动画与视频逐帧对应）
+        at = (getattr(seq, "add_track", None) or getattr(seq, "add_master_track"))(unreal.MovieSceneAudioTrack)
+        at.set_display_name("原声")
+        asec = at.add_section()
+        asec.set_sound(sound)
+        asec.set_range(0, nf)
     cam = seq.add_spawnable_from_class(unreal.CineCameraActor)
     cam.set_display_name("OrigCam")
     cc = cam.get_object_template().get_editor_property("camera_component")
@@ -346,14 +373,18 @@ def run_job(job, log=_log, step=lambda msg: None):
     step("度量")
     res = measure(people, kh)
     step("关卡序列")
-    seq = build_sequence(job, people, res["frames"])
+    sound = import_audio(job["audio"], audio_dest(cd, job["audio"])) if job.get("audio") else None
+    log("audio", sound.get_path_name() if sound else None)
+    seq = build_sequence(job, people, res["frames"], sound)
+    res["audio"] = sound.get_path_name() if sound else None
     les.save_current_level()
     res["sequence"] = seq.get_path_name()
     res["level"] = f"{cd}/L_{job['clip']}"
     step("导出动画")
     export_anims(people, job["export_dir"])
     unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, True)
-    cleanup_sources(cd, [fbx_dest(cd, k, f) for k, f in enumerate(job["fbx"])], log)
+    keep = [fbx_dest(cd, k, f) for k, f in enumerate(job["fbx"])]
+    cleanup_sources(cd, keep + ([audio_dest(cd, job["audio"])] if job.get("audio") else []), log)
     res["ok"] = True
     with open(job["result"], "w", encoding="utf-8") as f:
         json.dump(res, f, ensure_ascii=False, indent=1)

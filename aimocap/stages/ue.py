@@ -18,7 +18,8 @@ def persons(c, cfg):
 
 def params(c, cfg):
     n = cfg["solve"]["num_people"]
-    return {"in": [file_sig(c.fbx / f"p{k}.fbx") for k in range(n)], "ue": cfg["ue"], "person": persons(c, cfg),
+    return {"in": [file_sig(c.fbx / f"p{k}.fbx") for k in range(n)], "video": file_sig(c.video),
+            "ue": cfg["ue"], "person": persons(c, cfg),
             "script": [file_sig(SCRIPTS / "ue" / f) for f in ("ue_pipeline.py", "ue_commandlet.py")]}
 
 
@@ -36,6 +37,23 @@ def camera_ue(cam):
     return [float(pos[0]), float(-pos[1]), float(pos[2]), 0.0, pitch, -yaw]
 
 
+def extract_audio(c, cfg):
+    """视频里的声音 → ue/audio.wav（48kHz 16bit），放进序列第 0 帧。动画与视频逐帧对应、同为 24fps，
+    所以声音不用变速。视频没有音轨时返回 None。"""
+    wav = c.ue / "audio.wav"
+    if wav.exists() and wav.stat().st_mtime >= c.video.stat().st_mtime:
+        return str(wav)
+    c.ue.mkdir(parents=True, exist_ok=True)
+    wav.unlink(missing_ok=True)
+    code, _ = sh([cfg["paths"]["ffmpeg"], "-v", "error", "-y", "-i", c.video, "-vn", "-ar", "48000", "-ac", "2",
+                  "-c:a", "pcm_s16le", wav], c.logs / "audio.log", check=False)
+    if code != 0 or not wav.exists() or wav.stat().st_size < 1000:
+        log("视频没有音轨，序列里不加声音")
+        wav.unlink(missing_ok=True)
+        return None
+    return str(wav)
+
+
 def build_job(c, cfg):
     n = cfg["solve"]["num_people"]
     cam = load_json(c.clean / "camera.json")
@@ -44,6 +62,7 @@ def build_job(c, cfg):
            "uniform_horizontal_scale": cfg["ue"]["uniform_horizontal_scale"],
            "force_horizontal_scale": cfg["ue"].get("force_horizontal_scale", 0),
            "fps": cam["fps"], "cam_ue": camera_ue(cam), "lens": cam["lens"], "res": cam["res"],
+           "audio": extract_audio(c, cfg),
            "export_dir": str(c.ue / "export"), "result": str(c.ue / "result.json")}
     save_json(c.ue / "job.json", job)
     return job
