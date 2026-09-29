@@ -143,8 +143,29 @@ def face_component(actor):
             or next((c for c in comps if "face" in c.get_name().lower()), None))
 
 
+def _key_points(vals, eps=1e-3):
+    """只保留拐点（线性插值误差超过 eps 的点），恒定曲线只留首帧。"""
+    n = len(vals)
+    if n == 0:
+        return []
+    if max(vals) - min(vals) < eps:
+        return [0]
+    keep, a = [0], 0
+    for i in range(2, n):
+        # a → i 连线上，中间各点的误差
+        va, vi = vals[a], vals[i]
+        bad = any(abs(vals[j] - (va + (vi - va) * (j - a) / (i - a))) > eps for j in range(a + 1, i))
+        if bad:
+            keep.append(i - 1)
+            a = i - 1
+    keep.append(n - 1)
+    return keep
+
+
 def add_face_track(seq, binding, face, data, log):
-    """表情：在 Face 组件上挂它的面部控制板（MetaHuman 的 Face_ControlBoard_CtrlRig），整条曲线写进控件。"""
+    """表情：在 Face 组件上挂它的面部控制板（MetaHuman 的 Face_ControlBoard_CtrlRig），把曲线直接写进轨道通道
+    （set_local_control_rig_* 需要序列在 Sequencer 里打开且绑定到它，实测不打开时 0 个关键帧）。
+    二维控件的通道名是 控件名.X / .Y。只写拐点、线性插值。"""
     lib = unreal.ControlRigSequencerLibrary
     rig_bp = face.get_skeletal_mesh_asset().get_editor_property("default_animating_rig")
     if rig_bp is None:
@@ -152,17 +173,30 @@ def add_face_track(seq, binding, face, data, log):
         return 0
     world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
     track = lib.find_or_create_control_rig_track(world, seq, rig_bp.generated_class(), binding)
-    rig = next((x.control_rig for x in lib.get_control_rigs(seq) if x.track == track), None)
-    if rig is None:
-        log("face: control rig not found on track, skipped")
+    secs = track.get_sections() if track else []
+    if not secs:
+        log("face: control rig track has no section, skipped")
         return 0
-    n = int(data["frames"])
-    frames = [unreal.FrameNumber(i) for i in range(n)]
-    for name, vals in data["float"].items():
-        lib.set_local_control_rig_floats(seq, rig, name, frames, [float(v) for v in vals])
+    chans = {str(c.channel_name): c for c in secs[0].get_all_channels()}
+    curves = dict(data["float"])
     for name, vv in data["vec2"].items():
-        lib.set_local_control_rig_vector2_ds(seq, rig, name, frames, [unreal.Vector2D(float(a), float(b)) for a, b in vv])
-    return len(data["float"]) + len(data["vec2"])
+        curves[name + ".X"] = [a for a, _ in vv]
+        curves[name + ".Y"] = [b for _, b in vv]
+    lin = unreal.MovieSceneKeyInterpolation.LINEAR
+    written, keys, missing = 0, 0, []
+    for name, vals in curves.items():
+        ch = chans.get(name)
+        if ch is None:
+            missing.append(name)
+            continue
+        for i in _key_points(vals):
+            ch.add_key(time=unreal.FrameNumber(i), new_value=float(vals[i]), interpolation=lin)
+            keys += 1
+        written += 1
+    if missing:
+        log("face: channels not found", missing[:8])
+    log(f"face: {written} channels, {keys} keys")
+    return written
 
 
 def spawn_character(person, k):
@@ -333,6 +367,8 @@ def build_sequence(job, people, nf, sound=None, log=_log):
         fdata = None if job.get("headless") else (job.get("face") or [None] * len(people))[people.index(p)]
         face = face_component(p["actor"]) if fdata else None
         if face is not None:
+            if not job.get("headless"):          # 控制板轨道要求序列在 Sequencer 里打开
+                unreal.LevelSequenceEditorBlueprintLibrary.open_level_sequence(seq)
             fb = seq.add_possessable(face)
             nch = add_face_track(seq, fb, face, json.load(open(fdata, encoding="utf-8")), log)
             log(f"face p{people.index(p)}: {nch} channels")
