@@ -3,12 +3,12 @@
   "ywp_1080p": {
    "p0.after.dep3d": 0.001,
    "p0.after.lat3d": 0.0,
-   "p0.after.reproj_cm": 3.375,
+   "p0.after.reproj_cm": 3.464,
    "p0.after.penetration_pct": 2.216,
-   "p1.after.dep3d": 5.864,
-   "p1.after.lat3d": 3.346,
-   "p1.after.reproj_cm": 2.216,
-   "p1.after.penetration_pct": 3.047
+   "p1.after.dep3d": 0.001,
+   "p1.after.lat3d": 0.0,
+   "p1.after.reproj_cm": 2.536,
+   "p1.after.penetration_pct": 3.324
   }
  }
 }

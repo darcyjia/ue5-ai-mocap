@@ -95,6 +95,14 @@ def clean_person(P, par, k):
     # ① 着地检测 + 合并
     for name, sd in SIDES.items():
         sd["p"] = conf[:, list(sd["c"])].max(1)
+        if k.get("kin_contact", True):
+            # 运动学备用判据：脚掌贴地（离静止脚底高度 kin_height 以内）且水平速度慢 → 着地。
+            # ring01（55 秒）实测 GVHMR 给绿衣的着地概率中位数只有 0.03，只靠它锁脚完全失效。
+            fh = pos[:, sd["foot"], 1] - sole
+            v = np.linalg.norm(np.gradient(gaussian_filter1d(pos[:, sd["foot"]][:, [0, 2]], 1.5, axis=0), axis=0), axis=1) * P["fps"]
+            kin = (fh < k["kin_height"]) & (v < k["kin_speed"])
+            st[f"{name}_kin_pct"] = round(float(kin.mean() * 100), 1)
+            sd["p"] = np.maximum(sd["p"], np.where(kin, 0.75, 0.0))
         m = hysteresis(sd["p"], k["contact_on"], k["contact_off"]) & (pos[:, sd["foot"], 1] < k["foot_max_height"])
         raw = segments(m, k["min_segment"])
         sd["segs"], merged = merge_segments(raw, pos[:, sd["foot"], 1], k["merge_gap"], k["merge_max_lift"])
