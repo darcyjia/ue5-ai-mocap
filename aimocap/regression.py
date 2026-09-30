@@ -41,6 +41,6 @@ def run_tests(cfg, update=False):
             print(f"  {'FAIL' if worse else 'ok  '} {key}: {v}（基准 {ref}）")
             fails += worse
     if update:
-        GOLDEN.write_text(json.dumps(g, ensure_ascii=False, indent=1), encoding="utf-8")
+        GOLDEN.write_text(json.dumps(g, ensure_ascii=False, indent=1), encoding="utf-8", newline="\n")
         log("已更新基准")
     return 1 if fails else 0

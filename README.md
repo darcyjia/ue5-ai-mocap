@@ -117,7 +117,9 @@ curl -L -o models/hand_landmarker.task https://storage.googleapis.com/mediapipe-
 - 新克隆后执行一次 `git config core.hooksPath hooks`，启用推送前的回归测试钩子
 - 日常：改代码 → `python -m aimocap test` → 提交 → `git push`（钩子会再跑一次测试，指标变差会拒绝推送）
 - 大改动或试验性改动开分支：`git switch -c 试验名`，验证通过再合回 `main`
-- 发版：更新 `CHANGELOG.md`，然后 `git tag -a vX.Y.Z -m "说明" && git push origin vX.Y.Z`
+- 版本号（`主.次.修订`）三处同步：`aimocap/__init__.py` 的 `__version__`、`ue_plugin/AIMocap/AIMocap.uplugin` 的 `VersionName`（`Version` 加 1）、`CHANGELOG.md` 标题。`python -m aimocap --version` 查看当前版本
+- 发版：更新 `CHANGELOG.md` 和版本号 → 提交推送 → `git tag -a vX.Y.Z -m "说明" && git push origin vX.Y.Z` → `gh release create vX.Y.Z --notes-file <该版本的更新记录>`（GitHub 上的 Releases 页）
+- 回到旧版本：`git switch --detach v0.2.0`（看完 `git switch main` 回来）；UE 插件是目录链接，切换后重启 UE 即生效
 - 基准素材的中间产物（`aimocap_work/`）不进仓库，只登记指标在 `tests/golden.json`
 
 ## 踩过的坑（代码里已处理，改代码时别退回去）

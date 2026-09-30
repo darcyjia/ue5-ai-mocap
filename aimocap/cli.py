@@ -17,6 +17,7 @@ import sys
 import time
 from pathlib import Path
 
+from . import __version__
 from . import config as C
 from .state import Clip, State
 from .stages import clean, face, fbx, generate, hands, impact, preview, qc, solve, ue
@@ -93,6 +94,7 @@ def cmd_status(cfg, a):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="aimocap", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--version", action="version", version=f"aimocap {__version__}")
     ap.add_argument("--config")
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("new")
