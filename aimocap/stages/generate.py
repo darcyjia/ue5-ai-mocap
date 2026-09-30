@@ -63,9 +63,28 @@ def _poll(cfg, sid, logdir, timeout=1800):
     raise TimeoutError(f"等待生成超时：{sid}")
 
 
-def _download(url, dst):
-    Path(dst).parent.mkdir(parents=True, exist_ok=True)
-    urllib.request.urlretrieve(url, dst)
+def _download(url, dst, tries=4):
+    """先下到 .part，大小和 Content-Length 一致才改名。2026-09-30 实测：下载中途断开，
+    urlretrieve 抛错但留下 1MB 的残缺 video.mp4，下次运行会误以为视频已存在。"""
+    dst = Path(dst)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dst.with_suffix(dst.suffix + ".part")
+    last = None
+    for i in range(tries):
+        try:
+            with urllib.request.urlopen(url, timeout=120) as r, open(tmp, "wb") as f:
+                size = int(r.headers.get("Content-Length") or 0)
+                f.write(r.read())
+            if size and tmp.stat().st_size != size:
+                raise IOError(f"只下载到 {tmp.stat().st_size}/{size} 字节")
+            tmp.replace(dst)
+            return
+        except Exception as ex:
+            last = ex
+            log(f"下载失败（{i + 1}/{tries}）：{ex}")
+            time.sleep(5)
+    tmp.unlink(missing_ok=True)
+    raise RuntimeError(f"下载失败：{last}")
 
 
 def run_(c, cfg, args):
@@ -107,7 +126,11 @@ def run_(c, cfg, args):
         try:
             r = _poll(cfg, sid, c.logs)
             url = r["result_json"]["videos"][0]["video_url"]
-            _download(url, c.video)
+            try:
+                _download(url, c.video)
+            except RuntimeError as ex:                  # 已经扣费：不重试生成，告诉用户怎么免费重新下载
+                raise SystemExit(f"视频已生成（已扣费）但下载失败：{ex}\n任务号 {sid}，"
+                                 f"可用 dreamina query_result --submit_id={sid} 取地址重新下载到 {c.video}")
             after = credits(cfg)
             log(f"已下载 {c.video}，余额 {before} → {after}")
             return {"submit_id": sid, "credits_before": before, "credits_after": after, "attempts": attempt}
