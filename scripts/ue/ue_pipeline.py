@@ -415,6 +415,39 @@ def export_anims(people, out_dir):
         unreal.Exporter.run_asset_export_task(t)
 
 
+def export_meshes(people, job, log):
+    """给 Blender 预演用：把每个角色的骨骼网格（Body / Face / 衣服）导出成 FBX，按蓝图名缓存，已有就跳过。
+    只在编辑器里做（命令行无渲染，导出骨骼网格会 MeshObject 断言崩溃）。写 export_dir/meshes_p<k>.json 清单。"""
+    root = job.get("mesh_dir")
+    if not root:
+        return
+    for k, p in enumerate(people):
+        bp = (p["cfg"].get("mh_bp") or "").rsplit("/", 1)[-1] or f"p{k}"
+        d = os.path.join(root, bp)
+        os.makedirs(d, exist_ok=True)
+        files = {}
+        for comp in p["actor"].get_components_by_class(unreal.SkeletalMeshComponent):
+            mesh = comp.get_skeletal_mesh_asset()
+            if mesh is None:
+                continue
+            name = comp.get_name().replace("_GEN_VARIABLE", "")
+            key = "body" if name.lower() == "body" else "face" if "face" in name.lower() else mesh.get_name()
+            fn = os.path.join(d, f"{key}.fbx")
+            if not os.path.exists(fn):
+                t = unreal.AssetExportTask()
+                for kk, vv in dict(object=mesh, filename=fn, exporter=unreal.SkeletalMeshExporterFBX(),
+                                   options=unreal.FbxExportOption(), automated=True, replace_identical=True,
+                                   prompt=False).items():
+                    t.set_editor_property(kk, vv)
+                ok = unreal.Exporter.run_asset_export_task(t)
+                log("mesh export", bp, key, "ok" if ok else "FAILED")
+            if os.path.exists(fn):
+                files[key] = fn
+        with open(os.path.join(job["export_dir"], f"meshes_p{k}.json"), "w", encoding="utf-8") as f:
+            json.dump({"bp": bp, "anim": os.path.join(job["export_dir"], f"MH_p{k}.fbx"), "meshes": files}, f,
+                      ensure_ascii=False, indent=1)
+
+
 def run_job(job, log=_log, step=lambda msg: None):
     """完整执行一次 UE 阶段，结果写到 job['result'] 并返回。step(msg) 用于进度提示。"""
     cd, rd = job["content_dir"], job["retarget_dir"]
@@ -454,6 +487,9 @@ def run_job(job, log=_log, step=lambda msg: None):
     res["level"] = f"{cd}/L_{job['clip']}"
     step("导出动画")
     export_anims(people, job["export_dir"])
+    if not job.get("headless"):
+        step("导出 MetaHuman 网格（Blender 预演用）")
+        export_meshes(people, job, log)
     unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, True)
     keep = [fbx_dest(cd, k, f) for k, f in enumerate(job["fbx"])]
     cleanup_sources(cd, keep + ([audio_dest(cd, job["audio"])] if job.get("audio") else []), log)

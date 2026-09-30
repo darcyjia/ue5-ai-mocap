@@ -65,7 +65,7 @@ def build_job(c, cfg):
            "fps": cam["fps"], "cam_ue": camera_ue(cam), "lens": cam["lens"], "res": cam["res"],
            "audio": extract_audio(c, cfg),
            "face": [str(c.face / f"face_p{k}.json") if (c.face / f"face_p{k}.json").exists() else None for k in range(n)],
-           "export_dir": str(c.ue / "export"), "result": str(c.ue / "result.json")}
+           "export_dir": str(c.ue / "export"), "mesh_dir": str(c.root.parent / "_mh_meshes"), "result": str(c.ue / "result.json")}
     save_json(c.ue / "job.json", job)
     return job
 

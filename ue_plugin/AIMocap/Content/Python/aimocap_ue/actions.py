@@ -129,7 +129,7 @@ def finish_in_editor(clip):
     if dirty and _msg("AI 动捕", "当前关卡有未保存的修改。接下来会切换到素材专用关卡，是否先保存当前关卡？",
                       unreal.AppMsgType.YES_NO, YES) == YES:
         unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, False)
-    with unreal.ScopedSlowTask(8, f"AI 动捕：{clip} 重定向到 MetaHuman") as task:
+    with unreal.ScopedSlowTask(9, f"AI 动捕：{clip} 重定向到 MetaHuman") as task:
         task.make_dialog(True)
         res = ue_pipeline.run_job(job, step=lambda m: task.enter_progress_frame(1, f"AI 动捕：{m}"))
     core.cli(["mark", clip, "ue"])
