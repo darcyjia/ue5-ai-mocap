@@ -256,6 +256,35 @@ def open_impacts():
         core.open_path(tl) if tl.exists() else _msg("AI 动捕", f"{tl} 不存在（这个素材还没跑受力阶段）。")
 
 
+def import_edit():
+    folder = _pick_clip("AI 动捕：导入运镜（Blender 预演）")
+    if not folder:
+        return
+    cams = folder / "blender" / "cameras_ue.json"
+    if not cams.exists():
+        return _msg("AI 动捕", f"{cams} 不存在：先在 Blender 里做运镜预演并导出相机（export_cams_ue.py）。")
+    clip = folder.name
+    cd = f"{core.config()['ue']['content_root']}/{clip}"
+    try:
+        dirty = bool(unreal.EditorLoadingAndSavingUtils.get_dirty_map_packages())
+    except Exception:
+        dirty = False
+    if dirty and _msg("AI 动捕", "当前关卡有未保存的修改，是否先保存？", unreal.AppMsgType.YES_NO, YES) == YES:
+        unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, False)
+    unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).load_level(f"{cd}/L_{clip}")
+    import ue_edit
+    importlib.reload(ue_edit)
+    n = len(json.loads(cams.read_text(encoding="utf-8"))["shots"])
+    with unreal.ScopedSlowTask(n + 1, f"AI 动捕：导入 {clip} 的运镜") as task:
+        task.make_dialog(True)
+        edit = ue_edit.import_edit(str(folder), cd, clip, log=lambda *a: unreal.log("[AI 动捕] " + " ".join(map(str, a))),
+                                   step=lambda m: task.enter_progress_frame(1, f"AI 动捕：{m}"))
+    unreal.LevelSequenceEditorBlueprintLibrary.open_level_sequence(edit)
+    _msg("AI 动捕", f"已导入 {n} 个镜头：\n{edit.get_path_name()}\n\n"
+                    "成片序列里是镜头轨道，双击某个镜头可以进去改相机；表演（两个角色的动作和表情）"
+                    "是 LS_" + clip + " 的副本，原来的序列没动。")
+
+
 def open_hands():
     folder = _pick_clip("AI 动捕：查看手型识别")
     if folder:
