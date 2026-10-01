@@ -72,6 +72,7 @@ def build_shot(sh, perf, perf_frames, folder, fps, log, aspect=16 / 9, dof=None)
     fb.set_editor_property("sensor_height", 36.0 / aspect)      # 画幅与预演一致（宽 36mm 固定，高按比例）
     cc.set_editor_property("filmback", fb)
     cc.set_editor_property("current_focal_length", float(sh["lens"]))
+    cc.set_editor_property("constrain_aspect_ratio", True)      # 输出比例不同（如 2.35 画面出 16:9）时上下加黑边
     fs = cc.get_editor_property("focus_settings")
     fs.set_editor_property("focus_method", unreal.CameraFocusMethod.DISABLE)
     cc.set_editor_property("focus_settings", fs)

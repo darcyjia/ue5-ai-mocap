@@ -1,8 +1,8 @@
-"""Movie Render Queue 影视级渲染设置：正式版（4K 2.35:1、16 次时间采样、EXR + ProRes 422 HQ + WAV）
+"""Movie Render Queue 影视级渲染设置：正式版（标准 1920×1080，2.35:1 画面上下黑边，16 次时间采样、EXR + ProRes 422 HQ + WAV）
 和草稿版（HD、4 次采样、ProRes 422），外加一个渲染队列 Q_<素材>（草稿在前、正式在后）。
 用法：改下面的 SEQ / MAP / 输出目录，然后
   UnrealEditor-Cmd <uproject> -run=pythonscript -script=mrq_setup.py   （工程需启用 MovieRenderPipeline、AppleProResMedia）
-画幅要和相机胶片一致（2.35:1 → 36 × 15.32mm），否则会加黑边。"""
+相机胶片 2.35:1（36 × 15.32mm）且开着约束宽高比，输出 16:9 时上下自动黑边。"""
 import unreal
 L = lambda *a: unreal.log("@@ " + " ".join(str(x) for x in a))
 EAL = unreal.EditorAssetLibrary
@@ -68,15 +68,15 @@ def make(name, res, temporal, exr, prores_codec, outdir):
     return cfg
 
 
-final = make("MRQ_Final_4K_235", (3840, 1634), 16, True, unreal.AppleProResEncoderCodec.PRO_RES_422HQ, "G:/UE_Output/ring01/final")
-draft = make("MRQ_Draft_HD_235", (1920, 817), 4, False, unreal.AppleProResEncoderCodec.PRO_RES_422, "G:/UE_Output/ring01/draft")
+final = make("MRQ_Final_1080p_235", (1920, 1080), 16, True, unreal.AppleProResEncoderCodec.PRO_RES_422HQ, "G:/UE_Output/ring01/final")
+draft = make("MRQ_Draft_HD_235", (1920, 1080), 4, False, unreal.AppleProResEncoderCodec.PRO_RES_422, "G:/UE_Output/ring01/draft")
 q = None
 try:
     q = at.create_asset("Q_ring01", DIR, unreal.MoviePipelineQueue, None)
 except Exception as ex:
     L("queue asset err", ex)
 if q:
-    for cfg, nm in ((draft, "ring01 草稿 HD"), (final, "ring01 正式 4K")):
+    for cfg, nm in ((draft, "ring01 草稿 HD"), (final, "ring01 正式 1080p")):
         j = q.allocate_new_job(unreal.MoviePipelineExecutorJob)
         j.job_name = nm
         j.sequence = unreal.SoftObjectPath(SEQ)
