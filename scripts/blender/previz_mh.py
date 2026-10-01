@@ -121,6 +121,11 @@ if A.get("env_glb"):                                # 外部场景：场景保�
     before = set(bpy.data.objects)
     bpy.ops.import_scene.gltf(filepath=A["env_glb"])
     env = [o for o in bpy.data.objects if o not in before]
+    k = float(A.get("env_scale", 1.0))              # 场景比例不对时以原点为中心缩放（例：武道会擂台模型放大了约 1.43 倍 → 0.7）
+    if abs(k - 1.0) > 1e-6:
+        for o in env:
+            if o.parent is None:
+                o.matrix_world = Matrix.Scale(k, 4) @ o.matrix_world
     col = bpy.data.collections.new("ENV")
     sc.collection.children.link(col)
     for o in env:
@@ -134,7 +139,7 @@ if A.get("env_glb"):                                # 外部场景：场景保�
                          @ Matrix.Translation((-cx, -cy, 0)))
     for r in people:
         r.parent = root
-    info.update(env=A["env_glb"], place=[px, py, pz, yaw])
+    info.update(env=A["env_glb"], env_scale=k, place=[px, py, pz, yaw])
 else:
     size = max(12.0, math.ceil((ext + 5.0) / 2) * 2)      # 武道会擂台要显得开阔：至少 12 米
     bpy.ops.mesh.primitive_cube_add(size=1, location=(cx, cy, -0.5))
