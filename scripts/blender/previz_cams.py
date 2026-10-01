@@ -268,7 +268,8 @@ for s in SH["shots"]:
     film += len(fr)
     s["_ps"], s["_fr"] = ps, fr
 sc.frame_start = -int(round(SH["shots"][0].get("hold", 0) * FPS)) + 1 if SH["shots"][0].get("hold") else 1
-json.dump({"fps": FPS, "film_frames": film, "shots": edl}, open(os.path.join(os.path.dirname(A["shots"]), "edl.json"), "w",
+_w, _h = (int(x) for x in A.get("res", "960x540").split("x"))
+json.dump({"fps": FPS, "film_frames": film, "aspect": round(_w / _h, 4), "shots": edl}, open(os.path.join(os.path.dirname(A["shots"]), "edl.json"), "w",
           encoding="utf-8"), ensure_ascii=False, indent=1)
 bpy.ops.wm.save_as_mainfile(filepath=A["out_blend"])
 print("@@ cameras", len(edl), "film frames", film, "saved", A["out_blend"])

@@ -41,7 +41,7 @@ def cam_at(obj, frame):
     return [round(x * 100, 3) for x in to_ue(mw.translation)], [round(x, 4) for x in rotator(mw)]
 
 
-out = {"fps": E["fps"], "film_frames": E["film_frames"], "shots": []}
+out = {"fps": E["fps"], "film_frames": E["film_frames"], "aspect": E.get("aspect", 16 / 9), "shots": []}
 for s in E["shots"]:
     cam = bpy.data.objects[s["camera"]]
     a, b = s["key_frames"]

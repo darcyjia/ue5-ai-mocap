@@ -51,7 +51,7 @@ def make_perf(src, folder, stamp, log):
     return perf
 
 
-def build_shot(sh, perf, perf_frames, folder, fps, log):
+def build_shot(sh, perf, perf_frames, folder, fps, log, aspect=16 / 9):
     n = sh["frames"]
     seq = _new_seq(f"SH_{sh['id']}", folder, n, fps)
     cam = seq.add_spawnable_from_class(unreal.CineCameraActor)
@@ -59,7 +59,7 @@ def build_shot(sh, perf, perf_frames, folder, fps, log):
     cc = cam.get_object_template().get_editor_property("camera_component")
     fb = cc.get_editor_property("filmback")
     fb.set_editor_property("sensor_width", 36.0)
-    fb.set_editor_property("sensor_height", 36.0 * 9 / 16)
+    fb.set_editor_property("sensor_height", 36.0 / aspect)      # 画幅与预演一致（宽 36mm 固定，高按比例）
     cc.set_editor_property("filmback", fb)
     cc.set_editor_property("current_focal_length", float(sh["lens"]))
     fs = cc.get_editor_property("focus_settings")
@@ -111,7 +111,7 @@ def import_edit(clip_dir, content_dir, clip, log=print, step=lambda m: None, sav
     audio = edit.add_track(unreal.MovieSceneAudioTrack) if sound else None
     for i, sh in enumerate(data["shots"]):
         step(f"镜头 {sh['id']}")
-        seq = build_shot(sh, perf, perf_frames, f"{folder}/shots", fps, log)
+        seq = build_shot(sh, perf, perf_frames, f"{folder}/shots", fps, log, data.get("aspect", 16 / 9))
         a, n = sh["film_start"], sh["frames"]
         sec = shots.add_section()
         sec.set_sequence(seq)

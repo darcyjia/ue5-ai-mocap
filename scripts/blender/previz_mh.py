@@ -139,7 +139,9 @@ if A.get("env_glb"):                                # 外部场景：场景保�
                          @ Matrix.Translation((-cx, -cy, 0)))
     for r in people:
         r.parent = root
-    info.update(env=A["env_glb"], env_scale=k, place=[px, py, pz, yaw])
+    t = root.matrix_world.translation               # 角色 actor 在 UE 里的位置/朝向（Blender→UE：Y 取反、×100，转角取反）
+    info.update(env=A["env_glb"], env_scale=k, place=[px, py, pz, yaw],
+                ue_place_cm=[round(t.x * 100, 1), round(-t.y * 100, 1), round(t.z * 100, 1)], ue_yaw=-yaw)
 else:
     size = max(12.0, math.ceil((ext + 5.0) / 2) * 2)      # 武道会擂台要显得开阔：至少 12 米
     bpy.ops.mesh.primitive_cube_add(size=1, location=(cx, cy, -0.5))
