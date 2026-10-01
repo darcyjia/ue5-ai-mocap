@@ -134,11 +134,13 @@ def open_clip_level(path, template=None):
         les.load_level(path)
     else:
         les.new_level(path)
-        if template:
-            eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+    if template:                                      # 已有关卡里还没有这个场景时也补上（之前建的关卡可能是空的）
+        eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+        label = f"SCENE_{template.rsplit('/', 1)[-1]}"
+        if not any(a.get_actor_label() == label for a in eas.get_all_level_actors()):
             li = eas.spawn_actor_from_class(unreal.LevelInstance, unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, 0))
             li.set_editor_property("world_asset", unreal.load_asset(template))
-            li.set_actor_label(f"SCENE_{template.rsplit('/', 1)[-1]}")
+            li.set_actor_label(label)
     eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
     for a in eas.get_all_level_actors():
         if a.actor_has_tag(TAG):
