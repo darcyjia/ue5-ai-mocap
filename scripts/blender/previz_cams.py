@@ -123,8 +123,12 @@ def poses(s):
         tg = smooth(tg, 4) if s.get("track") else np.repeat(tg.mean(0, keepdims=True), n_, 0)
         cam = []
         for i in range(n_):
-            u = i / max(1, n_ - 1)
-            u = u * u * (3 - 2 * u)                  # 缓入缓出
+            if s.get("snap"):                         # 急推：前 snap 帧内迅速推到位，之后保持
+                u = min(1.0, i / s["snap"])
+                u = 1 - (1 - u) ** 3
+            else:
+                u = i / max(1, n_ - 1)
+                u = u * u * (3 - 2 * u)              # 缓入缓出
             az = math.radians(lerp(s["az"], s.get("az1", s["az"]), u))
             d, h = lerp(s["dist"], s.get("dist1", s["dist"]), u), lerp(s["h"], s.get("h1", s["h"]), u)
             off = math.cos(az) * n + math.sin(az) * Ld
@@ -139,7 +143,8 @@ def poses(s):
             for fi in IMPACTS:
                 if 0 <= f - fi < 8:
                     r2 = random.Random(fi)
-                    a = 0.9 * math.exp(-(f - fi) / (0.12 * FPS))
+                    amp = 0.9 if s["shake"] is True else float(s["shake"])     # true = 0.9°，数字 = 指定幅度
+                    a = amp * math.exp(-(f - fi) / (0.12 * FPS))
                     rx += math.radians(a * r2.uniform(-1, 1))
                     ry += math.radians(a * r2.uniform(-1, 1))
         if s.get("handheld"):
