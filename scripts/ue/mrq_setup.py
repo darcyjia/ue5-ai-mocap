@@ -1,4 +1,4 @@
-"""Movie Render Queue 影视级渲染设置：正式版（标准 1920×1080，2.35:1 画面上下黑边，16 次时间采样、EXR + ProRes 422 HQ + WAV）
+"""Movie Render Queue 影视级渲染设置（输出 H.265 mp4，不留序列帧）：正式版（标准 1920×1080，2.35:1 画面上下黑边，16 次时间采样、EXR + ProRes 422 HQ + WAV）
 和草稿版（HD、4 次采样、ProRes 422），外加一个渲染队列 Q_<素材>（草稿在前、正式在后）。
 用法：改下面的 SEQ / MAP / 输出目录，然后
   UnrealEditor-Cmd <uproject> -run=pythonscript -script=mrq_setup.py   （工程需启用 MovieRenderPipeline、AppleProResMedia）
@@ -23,7 +23,7 @@ CVARS = {
 }
 
 
-def make(name, res, temporal, exr, prores_codec, outdir):
+def make(name, res, temporal, quality, outdir):
     path = f"{DIR}/{name}"
     if EAL.does_asset_exist(path):
         cfg = unreal.load_asset(path)
@@ -55,21 +55,23 @@ def make(name, res, temporal, exr, prores_codec, outdir):
     cv = cfg.find_or_add_setting_by_class(unreal.MoviePipelineConsoleVariableSetting)
     for k, v in CVARS.items():
         cv.add_or_update_console_variable(k, float(v))
-    if exr:
-        e = cfg.find_or_add_setting_by_class(unreal.MoviePipelineImageSequenceOutput_EXR)
-        e.compression = unreal.EXRCompressionFormat.PIZ
-    pr = cfg.find_or_add_setting_by_class(unreal.MoviePipelineAppleProResOutput)
-    pr.codec = prores_codec
-    pr.include_audio = True
+    for cls in (unreal.MoviePipelineImageSequenceOutput_EXR, unreal.MoviePipelineAppleProResOutput):
+        old = cfg.find_setting_by_class(cls)
+        if old:
+            cfg.remove_setting(old)
+    cfg.find_or_add_setting_by_class(unreal.MoviePipelineImageSequenceOutput_PNG)   # 中间帧，编码成 H.265 后删除
+    enc = cfg.find_or_add_setting_by_class(unreal.MoviePipelineCommandLineEncoder)
+    enc.set_editor_property("quality", quality)
+    enc.set_editor_property("delete_source_files", True)
     if hasattr(unreal, "MoviePipelineWaveOutput"):
         cfg.find_or_add_setting_by_class(unreal.MoviePipelineWaveOutput)
     EAL.save_loaded_asset(cfg, only_if_is_dirty=False)   # 直接改属性不会标脏，默认会跳过保存
-    L("config", path, res, "temporal", temporal, "exr", exr, "settings", len(cfg.get_all_settings()))
+    L("config", path, res, "temporal", temporal, "quality", quality, "settings", len(cfg.get_all_settings()))
     return cfg
 
 
-final = make("MRQ_Final_1080p_235", (1920, 1080), 16, True, unreal.AppleProResEncoderCodec.PRO_RES_422HQ, "G:/UE_Output/ring01/final")
-draft = make("MRQ_Draft_HD_235", (1920, 1080), 4, False, unreal.AppleProResEncoderCodec.PRO_RES_422, "G:/UE_Output/ring01/draft")
+final = make("MRQ_Final_1080p_235", (1920, 1080), 16, unreal.MoviePipelineEncodeQuality.EPIC, "G:/UE_Output/ring01/final")
+draft = make("MRQ_Draft_HD_235", (1920, 1080), 4, unreal.MoviePipelineEncodeQuality.HIGH, "G:/UE_Output/ring01/draft")
 q = None
 try:
     q = at.create_asset("Q_ring01", DIR, unreal.MoviePipelineQueue, None)
