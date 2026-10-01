@@ -63,7 +63,7 @@ def make(name, res, temporal, exr, prores_codec, outdir):
     pr.include_audio = True
     if hasattr(unreal, "MoviePipelineWaveOutput"):
         cfg.find_or_add_setting_by_class(unreal.MoviePipelineWaveOutput)
-    EAL.save_loaded_asset(cfg)
+    EAL.save_loaded_asset(cfg, only_if_is_dirty=False)   # 直接改属性不会标脏，默认会跳过保存
     L("config", path, res, "temporal", temporal, "exr", exr, "settings", len(cfg.get_all_settings()))
     return cfg
 
@@ -82,5 +82,5 @@ if q:
         j.sequence = unreal.SoftObjectPath(SEQ)
         j.map = unreal.SoftObjectPath(MAP)
         j.set_configuration(cfg)
-    EAL.save_loaded_asset(q)
+    EAL.save_loaded_asset(q, only_if_is_dirty=False)
     L("queue", q.get_path_name(), "jobs", len(q.get_jobs()))
