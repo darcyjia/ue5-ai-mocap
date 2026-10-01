@@ -105,7 +105,7 @@ for k in range(2):
 
 sc.render.fps = int(cam_j["fps"])
 sc.frame_start, sc.frame_end = 1, L
-# 活动范围（骨盆轨迹）→ 擂台
+# 活动范围（骨盆轨迹）→ 擂台（或放进外部场景：--env-glb 场景 --place x,y,z,yaw）
 xs, ys = [], []
 for f in range(1, L + 1, 4):
     sc.frame_set(f)
@@ -115,29 +115,51 @@ for f in range(1, L + 1, 4):
         ys.append(p.y)
 cx, cy = (min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2
 ext = max(max(xs) - min(xs), max(ys) - min(ys))
-size = max(12.0, math.ceil((ext + 5.0) / 2) * 2)          # 武道会擂台要显得开阔：至少 12 米
-bpy.ops.mesh.primitive_cube_add(size=1, location=(cx, cy, -0.5))
-ring = bpy.context.active_object
-ring.name, ring.scale = "ring", (size, size, 1.0)
-ring.data.materials.append(mat("ring_m", (0.62, 0.6, 0.55, 1)))
-bpy.ops.mesh.primitive_plane_add(size=80, location=(cx, cy, -1.0))
-bpy.context.active_object.name = "arena_ground"
-bpy.context.active_object.data.materials.append(mat("ground_m", (0.3, 0.33, 0.3, 1)))
-info = {"center": [round(cx, 3), round(cy, 3)], "extent_m": round(ext, 2), "ring_size_m": size, "ring_height_m": 1.0,
+info = {"center": [round(cx, 3), round(cy, 3)], "extent_m": round(ext, 2),
         "x_range": [round(min(xs), 2), round(max(xs), 2)], "y_range": [round(min(ys), 2), round(max(ys), 2)], "frames": L}
+if A.get("env_glb"):                                # 外部场景：场景保持原坐标（=UE 坐标 X、-Y、Z，米），把两人整体放进去
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=A["env_glb"])
+    env = [o for o in bpy.data.objects if o not in before]
+    col = bpy.data.collections.new("ENV")
+    sc.collection.children.link(col)
+    for o in env:
+        for c in list(o.users_collection):
+            c.objects.unlink(o)
+        col.objects.link(o)
+    px, py, pz, yaw = (float(v) for v in A["place"].split(","))
+    root = bpy.data.objects.new("FIGHT_ROOT", None)
+    sc.collection.objects.link(root)
+    root.matrix_world = (Matrix.Translation((px, py, pz)) @ Matrix.Rotation(math.radians(yaw), 4, "Z")
+                         @ Matrix.Translation((-cx, -cy, 0)))
+    for r in people:
+        r.parent = root
+    info.update(env=A["env_glb"], place=[px, py, pz, yaw])
+else:
+    size = max(12.0, math.ceil((ext + 5.0) / 2) * 2)      # 武道会擂台要显得开阔：至少 12 米
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(cx, cy, -0.5))
+    ring = bpy.context.active_object
+    ring.name, ring.scale = "ring", (size, size, 1.0)
+    ring.data.materials.append(mat("ring_m", (0.62, 0.6, 0.55, 1)))
+    bpy.ops.mesh.primitive_plane_add(size=80, location=(cx, cy, -1.0))
+    bpy.context.active_object.name = "arena_ground"
+    bpy.context.active_object.data.materials.append(mat("ground_m", (0.3, 0.33, 0.3, 1)))
+    info.update(ring_size_m=size, ring_height_m=1.0)
 # 原机位参考相机
 cd = bpy.data.cameras.new("orig_cam")
 cd.lens, cd.sensor_width, cd.sensor_fit = cam_j["lens"], 36, "HORIZONTAL"
 cam = bpy.data.objects.new("orig_cam", cd)
 sc.collection.objects.link(cam)
 cam.matrix_world = Matrix.Rotation(math.radians(90), 4, "X") @ Matrix([list(r) + [p] for r, p in zip(cam_j["R"], cam_j["pos"])] + [[0, 0, 0, 1]])
+if A.get("env_glb"):                                # 原机位跟着人一起放进场景（相机选边时用来判断"原机位一侧"）
+    cam.matrix_world = root.matrix_world @ cam.matrix_world
 sc.camera = cam
 sc.render.resolution_x, sc.render.resolution_y = cam_j["res"]
 sc.render.engine = "BLENDER_WORKBENCH"
 sc.display.shading.color_type = "MATERIAL"
 sc.world = bpy.data.worlds.new("w")
 sc.world.color = (0.2, 0.2, 0.22)
-json.dump(info, open(os.path.join(C, "blender", "ring.json"), "w"), indent=1)
+json.dump(info, open(os.path.join(C, "blender", "env.json" if A.get("env_glb") else "ring.json"), "w"), indent=1)
 bpy.ops.wm.save_as_mainfile(filepath=A["out"])
 print("@@ ring", json.dumps(info))
 print("@@ saved", A["out"])

@@ -106,6 +106,47 @@ if A.get("impacts") and os.path.exists(A["impacts"]):
         IMPACTS += [e["frame"] + 1 for e in p["impacts"]]
 
 
+CHAR = [o for o in bpy.data.objects if o.type == "MESH" and o.name[:3] in ("p0_", "p1_")]
+
+
+def _rc(dg, o, d, dist):
+    n = float(np.linalg.norm(d))
+    if n < 1e-6:
+        return None
+    hit, loc, *_ = sc.ray_cast(dg, Vector(o), Vector(d / n), distance=dist)
+    return (Vector(loc) - Vector(o)).length if hit else None
+
+
+def visible(cam, tg, fr, step=4):
+    """外部场景里这个机位能不能用：每隔 step 帧，①相机到两人头/胸/骨盆 6 个点都无遮挡；②镜头前 1.5 米内
+    画面范围（3×3 条射线）没有东西。返回 (是否合格, 视线最短可用比例)。只看场景，不看两个角色。"""
+    for o in CHAR:
+        o.hide_viewport = True
+    dg = bpy.context.evaluated_depsgraph_get()
+    ok, ratio = True, 1.0
+    for i in range(0, len(cam), step):
+        c, t, f = cam[i], tg[i], fr[i]
+        for k in range(2):
+            for bn in ("head", "chest", "pelvis"):
+                p = POS[k][bn][f]
+                d = c - p
+                dist = float(np.linalg.norm(d))
+                h = _rc(dg, p, d, dist)
+                if h is not None:
+                    ok = False
+                    ratio = min(ratio, max(0.0, h - 0.25) / dist)
+        fwd = unit(t - c)
+        right = unit(np.cross(fwd, [0, 0, 1.0]))
+        up = np.cross(right, fwd)
+        for a in (-0.3, 0.0, 0.3):
+            for b in (-0.17, 0.0, 0.17):
+                if _rc(dg, c, fwd + right * a + up * b, 1.5) is not None:
+                    ok = False
+    for o in CHAR:
+        o.hide_viewport = False
+    return ok, ratio
+
+
 def poses(s):
     """逐帧 (位置, 旋转四元数)。"""
     fr = shot_frames(s)
@@ -121,19 +162,66 @@ def poses(s):
     else:
         tg = np.array([target(s["target"], f) for f in fr])
         tg = smooth(tg, 4) if s.get("track") else np.repeat(tg.mean(0, keepdims=True), n_, 0)
-        cam = []
-        for i in range(n_):
-            if s.get("snap"):                         # 急推：前 snap 帧内迅速推到位，之后保持
-                u = min(1.0, i / s["snap"])
-                u = 1 - (1 - u) ** 3
-            else:
-                u = i / max(1, n_ - 1)
-                u = u * u * (3 - 2 * u)              # 缓入缓出
-            az = math.radians(lerp(s["az"], s.get("az1", s["az"]), u))
-            d, h = lerp(s["dist"], s.get("dist1", s["dist"]), u), lerp(s["h"], s.get("h1", s["h"]), u)
-            off = math.cos(az) * n + math.sin(az) * Ld
-            cam.append(np.array([tg[i][0] + off[0] * d, tg[i][1] + off[1] * d, h]))
-        cam = np.array(cam)
+
+        def orbit(off):
+            out = []
+            for i in range(n_):
+                if s.get("snap"):                     # 急推：前 snap 帧内迅速推到位，之后保持
+                    u = min(1.0, i / s["snap"])
+                    u = 1 - (1 - u) ** 3
+                else:
+                    u = i / max(1, n_ - 1)
+                    u = u * u * (3 - 2 * u)          # 缓入缓出
+                az = math.radians(lerp(s["az"], s.get("az1", s["az"]), u) + off)
+                d, h = lerp(s["dist"], s.get("dist1", s["dist"]), u), lerp(s["h"], s.get("h1", s["h"]), u)
+                o = math.cos(az) * n + math.sin(az) * Ld
+                out.append(np.array([tg[i][0] + o[0] * d, tg[i][1] + o[1] * d, h]))
+            return np.array(out)
+        cam = orbit(0.0)
+        if A.get("avoid"):                            # 外部场景：按改动从小到大试 换角度 / 升高 / 拉近
+            base = s["az"]
+            sgn = (1, -1) if base >= 0 else (-1, 1)
+            offs = [0.0] + [g * k for k in (15, 30, 45, 60, 75) for g in sgn]
+            cands = []
+            for off in offs:
+                if abs(base + off) > 85 or abs(s.get("az1", base) + off) > 85:
+                    continue
+                for dh in (0.0, 0.6, 1.2):
+                    for df in (1.0, 0.75, 0.55):
+                        cands.append((abs(off) / 15 + dh / 0.6 * 1.5 + (1 - df) / 0.25 * 1.2, off, dh, df))
+            cands.sort()
+            best = None
+            for cost, off, dh, df in cands:
+                c = orbit(off)
+                c = tg + (c - tg) * df
+                c[:, 2] += dh
+                ok, r = visible(c, tg, fr)
+                if ok:
+                    best = (off, dh, df, c, 1.0)
+                    break
+                if best is None or r > best[4]:
+                    best = (off, dh, df, c, r)
+            off, dh, df, cam, r = best
+            k = df if r >= 1.0 else df * max(r - 0.05, 0.15)
+            if r < 1.0:                               # 都不合格：取视线最好的，再拉到遮挡物前面
+                cam = tg + (cam - tg) * max(r - 0.05, 0.15)
+            if k < 0.999:
+                s["_lens"] = max(14.0, s["lens"] * k)
+            s["_avoid"] = {"az_offset": off, "raise": dh, "dist_k": round(k, 2), "ok": r >= 1.0,
+                           "lens": round(s.get("_lens", s["lens"]), 1)}
+    if A.get("avoid") and kind == "ots":
+        ok, r = visible(cam, tg, fr)
+        if not ok:                                    # 过肩：往肩后上方抬一点再拉近
+            for dh, df in ((0.3, 1.0), (0.3, 0.8), (0.6, 0.7)):
+                c = tg + (cam - tg) * df
+                c[:, 2] += dh
+                ok2, r2 = visible(c, tg, fr)
+                if ok2:
+                    cam, ok, r = c, True, 1.0
+                    if df < 1:
+                        s["_lens"] = max(14.0, s["lens"] * df)
+                    break
+        s["_avoid"] = {"ok": ok, "lens": round(s.get("_lens", s["lens"]), 1)}
     rng = random.Random(s["id"])
     out = []
     for i, f in enumerate(fr):
@@ -163,7 +251,7 @@ edl, film = [], 0
 for s in SH["shots"]:
     fr, ps = poses(s)
     cd = bpy.data.cameras.new(f"CAM_{s['id']}")
-    cd.lens, cd.sensor_width = s["lens"], 36
+    cd.lens, cd.sensor_width = s.get("_lens", s["lens"]), 36
     cam = bpy.data.objects.new(f"CAM_{s['id']}", cd)
     sc.collection.objects.link(cam)
     cam.rotation_mode = "QUATERNION"
@@ -175,7 +263,7 @@ for s in SH["shots"]:
     if not s["id"][-1] in "bc":                      # 主线（重复剪辑只取第一个角度）打相机切换标记
         m = sc.timeline_markers.new(s["id"], frame=keyf[0])
         m.camera = cam
-    edl.append({"id": s["id"], "desc": s["desc"], "camera": cam.name, "lens": s["lens"], "film_start": film,
+    edl.append({"id": s["id"], "desc": s["desc"], "camera": cam.name, "lens": round(s.get("_lens", s["lens"]), 2), "avoid": s.get("_avoid"), "film_start": film,
                 "frames": len(fr), "anim_frames": [fr[0], fr[-1]], "hold": bool(s.get("hold")), "key_frames": [keyf[0], keyf[-1]]})
     film += len(fr)
     s["_ps"], s["_fr"] = ps, fr
@@ -204,8 +292,8 @@ if A.get("render_dir"):
     os.makedirs(A["render_dir"], exist_ok=True)
     i = 0
     for s in SH["shots"]:
-        rc.data.lens = s["lens"]
-        sc.render.stamp_note_text = f"{s['id']}   anim {s['_fr'][0]}-{s['_fr'][-1]}   lens {s['lens']}mm"
+        rc.data.lens = s.get("_lens", s["lens"])
+        sc.render.stamp_note_text = f"{s['id']}   anim {s['_fr'][0]}-{s['_fr'][-1]}   lens {rc.data.lens:.0f}mm"
         for f, (p, q) in zip(s["_fr"], s["_ps"]):
             sc.frame_set(f)
             sc.camera = rc                           # 时间轴上的相机切换标记会在换帧时改 scene.camera
