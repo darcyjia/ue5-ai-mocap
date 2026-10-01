@@ -3,6 +3,7 @@
 开场定格 = 循环播放表演的第 1 帧；重复剪辑 = 多个镜头指向同一段动画。原声放在成片序列上，按剪辑表逐段对齐。
 相机数据来自 Blender 的 export_cams_ue.py（cameras_ue.json，UE 坐标）。"""
 import json
+import os
 import time
 
 import unreal
@@ -51,7 +52,16 @@ def make_perf(src, folder, stamp, log):
     return perf
 
 
-def build_shot(sh, perf, perf_frames, folder, fps, log, aspect=16 / 9):
+def set_dof(cc, d):
+    """特写景深：手动对焦（厘米）+ 光圈。d = dof.json 里这个镜头的一项。"""
+    fs = cc.get_editor_property("focus_settings")
+    fs.set_editor_property("focus_method", unreal.CameraFocusMethod.MANUAL)
+    fs.set_editor_property("manual_focus_distance", float(d["focus_cm"]))
+    cc.set_editor_property("focus_settings", fs)
+    cc.set_editor_property("current_aperture", float(d["fstop"]))
+
+
+def build_shot(sh, perf, perf_frames, folder, fps, log, aspect=16 / 9, dof=None):
     n = sh["frames"]
     seq = _new_seq(f"SH_{sh['id']}", folder, n, fps)
     cam = seq.add_spawnable_from_class(unreal.CineCameraActor)
@@ -65,6 +75,8 @@ def build_shot(sh, perf, perf_frames, folder, fps, log, aspect=16 / 9):
     fs = cc.get_editor_property("focus_settings")
     fs.set_editor_property("focus_method", unreal.CameraFocusMethod.DISABLE)
     cc.set_editor_property("focus_settings", fs)
+    if dof:
+        set_dof(cc, dof)
     ch = cam.add_track(unreal.MovieScene3DTransformTrack).add_section()
     ch.set_range(0, n)
     chans = ch.get_all_channels()
@@ -92,7 +104,10 @@ def build_shot(sh, perf, perf_frames, folder, fps, log, aspect=16 / 9):
 
 
 def import_edit(clip_dir, content_dir, clip, log=print, step=lambda m: None, save=True, cams=None):
-    data = json.load(open(cams or f"{clip_dir}/blender/cameras_ue.json", encoding="utf-8"))
+    cams = cams or f"{clip_dir}/blender/cameras_ue.json"
+    data = json.load(open(cams, encoding="utf-8"))
+    dof_path = os.path.join(os.path.dirname(cams), "dof.json")   # 有就给特写开景深（Blender 预演里按脸部距离算）
+    dofs = json.load(open(dof_path, encoding="utf-8")) if os.path.exists(dof_path) else {}
     fps = data["fps"]
     src = unreal.load_asset(f"{content_dir}/LS_{clip}")
     if src is None:
@@ -111,7 +126,7 @@ def import_edit(clip_dir, content_dir, clip, log=print, step=lambda m: None, sav
     audio = edit.add_track(unreal.MovieSceneAudioTrack) if sound else None
     for i, sh in enumerate(data["shots"]):
         step(f"镜头 {sh['id']}")
-        seq = build_shot(sh, perf, perf_frames, f"{folder}/shots", fps, log, data.get("aspect", 16 / 9))
+        seq = build_shot(sh, perf, perf_frames, f"{folder}/shots", fps, log, data.get("aspect", 16 / 9), dofs.get(sh["id"]))
         a, n = sh["film_start"], sh["frames"]
         sec = shots.add_section()
         sec.set_sequence(seq)
