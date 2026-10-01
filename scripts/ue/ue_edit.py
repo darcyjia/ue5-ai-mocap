@@ -91,8 +91,8 @@ def build_shot(sh, perf, perf_frames, folder, fps, log):
     return seq
 
 
-def import_edit(clip_dir, content_dir, clip, log=print, step=lambda m: None, save=True):
-    data = json.load(open(f"{clip_dir}/blender/cameras_ue.json", encoding="utf-8"))
+def import_edit(clip_dir, content_dir, clip, log=print, step=lambda m: None, save=True, cams=None):
+    data = json.load(open(cams or f"{clip_dir}/blender/cameras_ue.json", encoding="utf-8"))
     fps = data["fps"]
     src = unreal.load_asset(f"{content_dir}/LS_{clip}")
     if src is None:

@@ -127,6 +127,7 @@ def main(argv=None):
     s.add_argument("clip")
     s.add_argument("stage", choices=NAMES)
     s = sub.add_parser("install-ue-plugin")
+    s.add_argument("--project", help="装到哪个 .uproject（默认 config 的 ue_project）")
     s = sub.add_parser("test")
     s.add_argument("--update", action="store_true")
     a = ap.parse_args(argv)
@@ -151,7 +152,7 @@ def main(argv=None):
         log(f"已登记 {a.clip} 的 {a.stage} 阶段")
     elif a.cmd == "install-ue-plugin":
         from .install import install_ue_plugin
-        install_ue_plugin(cfg)
+        install_ue_plugin(cfg, a.project)
     elif a.cmd == "test":
         from .regression import run_tests
         sys.exit(run_tests(cfg, a.update))

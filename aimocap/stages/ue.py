@@ -64,6 +64,7 @@ def build_job(c, cfg):
            "force_horizontal_scale": cfg["ue"].get("force_horizontal_scale", 0),
            "fps": cam["fps"], "cam_ue": camera_ue(cam), "lens": cam["lens"], "res": cam["res"],
            "audio": extract_audio(c, cfg),
+           "ue_overrides": load_json(c.input / "ue.json", {}) or {},     # 按 UE 工程名：level_template / place_cm / yaw / cameras
            "face": [str(c.face / f"face_p{k}.json") if (c.face / f"face_p{k}.json").exists() else None for k in range(n)],
            "export_dir": str(c.ue / "export"), "mesh_dir": str(c.root.parent / "_mh_meshes"), "result": str(c.ue / "result.json")}
     save_json(c.ue / "job.json", job)

@@ -260,7 +260,10 @@ def import_edit():
     folder = _pick_clip("AI 动捕：导入运镜（Blender 预演）")
     if not folder:
         return
-    cams = folder / "blender" / "cameras_ue.json"
+    proj = Path(unreal.Paths.get_project_file_path()).stem
+    uej = folder / "input" / "ue.json"
+    ov = (json.loads(uej.read_text(encoding="utf-8")) if uej.exists() else {}).get(proj, {})
+    cams = folder / ov.get("cameras", "blender/cameras_ue.json")     # 每个工程可以用不同版本的运镜（如小巷版）
     if not cams.exists():
         return _msg("AI 动捕", f"{cams} 不存在：先在 Blender 里做运镜预演并导出相机（export_cams_ue.py）。")
     clip = folder.name
@@ -277,7 +280,7 @@ def import_edit():
     n = len(json.loads(cams.read_text(encoding="utf-8"))["shots"])
     with unreal.ScopedSlowTask(n + 1, f"AI 动捕：导入 {clip} 的运镜") as task:
         task.make_dialog(True)
-        edit = ue_edit.import_edit(str(folder), cd, clip, log=lambda *a: unreal.log("[AI 动捕] " + " ".join(map(str, a))),
+        edit = ue_edit.import_edit(str(folder), cd, clip, cams=str(cams), log=lambda *a: unreal.log("[AI 动捕] " + " ".join(map(str, a))),
                                    step=lambda m: task.enter_progress_frame(1, f"AI 动捕：{m}"))
     unreal.LevelSequenceEditorBlueprintLibrary.open_level_sequence(edit)
     _msg("AI 动捕", f"已导入 {n} 个镜头：\n{edit.get_path_name()}\n\n"

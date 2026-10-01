@@ -10,8 +10,8 @@ from .util import ROOT, log
 SRC = ROOT / "ue_plugin" / "AIMocap"
 
 
-def install_ue_plugin(cfg):
-    proj = Path(cfg["paths"]["ue_project"])
+def install_ue_plugin(cfg, project=None):
+    proj = Path(project or cfg["paths"]["ue_project"])
     link = proj.parent / "Plugins" / "AIMocap"
     link.parent.mkdir(exist_ok=True)
     if link.exists():

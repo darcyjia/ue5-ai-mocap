@@ -117,13 +117,28 @@ def import_fbx(fbx, dest, fps):
             next(x for x in assets if isinstance(x, unreal.AnimSequence)))
 
 
-def open_clip_level(path):
-    """打开（或新建）素材专用关卡，清掉上一次放进去的 AIMocap 角色。"""
+def project_name():
+    return os.path.splitext(os.path.basename(unreal.Paths.get_project_file_path()))[0]
+
+
+def overrides(job):
+    """input/ue.json 里当前 UE 工程的设置（没有就空）：level_template 场景关卡、place_cm 打斗放置位置、yaw、cameras 运镜。"""
+    return (job.get("ue_overrides") or {}).get(project_name(), {})
+
+
+def open_clip_level(path, template=None):
+    """打开（或新建）素材专用关卡，清掉上一次放进去的 AIMocap 角色。
+    template：新建时用关卡实例把这个场景关卡整个引用进来（不改动原关卡）。"""
     les = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
     if EAL.does_asset_exist(path):
         les.load_level(path)
     else:
         les.new_level(path)
+        if template:
+            eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
+            li = eas.spawn_actor_from_class(unreal.LevelInstance, unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, 0))
+            li.set_editor_property("world_asset", unreal.load_asset(template))
+            li.set_actor_label(f"SCENE_{template.rsplit('/', 1)[-1]}")
     eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
     for a in eas.get_all_level_actors():
         if a.actor_has_tag(TAG):
@@ -199,20 +214,20 @@ def add_face_track(seq, binding, face, data, log):
     return written
 
 
-def spawn_character(person, k):
+def spawn_character(person, k, place=(0, 0, 0), yaw=0.0):
     """放一个 MetaHuman 蓝图到原点（动画里带世界坐标的根运动），返回 (actor, body 组件, 身体网格)。
     没配 mh_bp 时退回到只用身体网格的 SkeletalMeshActor。"""
     eas = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
     if person.get("mh_bp"):
         bp = unreal.load_asset(person["mh_bp"])
-        actor = eas.spawn_actor_from_class(bp.generated_class(), unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, 0))
+        actor = eas.spawn_actor_from_class(bp.generated_class(), unreal.Vector(*place), unreal.Rotator(0, 0, yaw))
         body = body_component(actor)
         if body is None:
             raise RuntimeError(f"{person['mh_bp']} 里找不到 Body 骨骼网格组件")
         mesh = body.get_skeletal_mesh_asset()
     else:
         mesh = unreal.load_asset(person["mh_mesh"])
-        actor = eas.spawn_actor_from_class(unreal.SkeletalMeshActor, unreal.Vector(0, 0, 0), unreal.Rotator(0, 0, 0))
+        actor = eas.spawn_actor_from_class(unreal.SkeletalMeshActor, unreal.Vector(*place), unreal.Rotator(0, 0, yaw))
         body = actor.skeletal_mesh_component
         body.set_skeletal_mesh_asset(mesh)
     actor.tags = [TAG]
@@ -423,7 +438,7 @@ def export_meshes(people, job, log):
         return
     for k, p in enumerate(people):
         bp = (p["cfg"].get("mh_bp") or "").rsplit("/", 1)[-1] or f"p{k}"
-        d = os.path.join(root, bp)
+        d = os.path.join(root, project_name(), bp)   # 不同工程里同名蓝图可能是不同角色
         os.makedirs(d, exist_ok=True)
         files = {}
         for comp in p["actor"].get_components_by_class(unreal.SkeletalMeshComponent):
@@ -448,6 +463,14 @@ def export_meshes(people, job, log):
                       ensure_ascii=False, indent=1)
 
 
+def place_cam(cam_ue, place, yaw):
+    """原机位相机跟着角色一起放：先绕原点转 yaw，再平移 place（UE 坐标、厘米）。"""
+    x, y, z, roll, pitch, cyaw = cam_ue
+    a = math.radians(yaw)
+    return [x * math.cos(a) - y * math.sin(a) + place[0], x * math.sin(a) + y * math.cos(a) + place[1], z + place[2],
+            roll, pitch, cyaw + yaw]
+
+
 def run_job(job, log=_log, step=lambda msg: None):
     """完整执行一次 UE 阶段，结果写到 job['result'] 并返回。step(msg) 用于进度提示。"""
     cd, rd = job["content_dir"], job["retarget_dir"]
@@ -458,10 +481,15 @@ def run_job(job, log=_log, step=lambda msg: None):
         people.append(dict(mesh=mesh, anim=anim, cfg=job["persons"][k]))
         log(f"p{k} imported", anim.get_path_name(), "frames", AL.get_num_frames(anim))
     step("准备素材关卡和角色")
-    les = open_clip_level(f"{cd}/L_{job['clip']}")
+    ov = overrides(job)
+    place, yaw = tuple(ov.get("place_cm", (0, 0, 0))), float(ov.get("yaw", 0.0))
+    if ov:
+        log("project overrides", project_name(), ov)
+        job = {**job, "cam_ue": place_cam(job["cam_ue"], place, yaw)}
+    les = open_clip_level(f"{cd}/L_{job['clip']}", ov.get("level_template"))
     cache = {}
     for k, p in enumerate(people):
-        p["actor"], p["body"], p["tmesh"] = spawn_character(p["cfg"], k)
+        p["actor"], p["body"], p["tmesh"] = spawn_character(p["cfg"], k, place, yaw)
         p["rig"] = source_rig(f"{cd}/IK_SMPLX_p{k}", p["mesh"])
         p["trig"] = mh_rig(p["tmesh"], rd, cache)
         p["ratio"] = ref_z(p["trig"], "pelvis") / ref_z(p["rig"], "pelvis")
