@@ -22,17 +22,27 @@ def install_ue_plugin(cfg, project=None):
     else:
         r = subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(SRC)], stdout=subprocess.PIPE,
                            stderr=subprocess.STDOUT)
-        if r.returncode != 0:
-            raise SystemExit("创建目录链接失败：" + r.stdout.decode("gbk", errors="replace"))
-        log(f"已链接：{link} → {SRC}")
+        if r.returncode == 0:
+            log(f"已链接：{link} → {SRC}")
+        else:                                       # 非 NTFS 盘（如 exFAT）建不了目录链接：改用工程的额外插件目录
+            link = None
+            log("建目录链接失败（" + r.stdout.decode("gbk", errors="replace").strip() + "），改用 AdditionalPluginDirectories")
     d = json.loads(proj.read_text(encoding="utf-8"))
+    if link is None:
+        extra = d.setdefault("AdditionalPluginDirectories", [])
+        if str(SRC.parent).replace("\\", "/") not in [x.replace("\\", "/") for x in extra]:
+            extra.append(str(SRC.parent).replace("\\", "/"))
+        try:
+            (proj.parent / "Plugins").rmdir()            # 刚才建的空目录
+        except OSError:
+            pass
     names = {p["Name"] for p in d.get("Plugins", [])}
     need = [n for n in ("AIMocap", "PythonScriptPlugin", "EditorScriptingUtilities") if n not in names]
-    if need:
+    if need or link is None:
         bak = proj.with_suffix(".uproject.bak_aimocap")
         if not bak.exists():
             shutil.copy(proj, bak)
         d.setdefault("Plugins", []).extend({"Name": n, "Enabled": True} for n in need)
         proj.write_text(json.dumps(d, indent="\t", ensure_ascii=False), encoding="utf-8")
-        log(f"已在 {proj.name} 里启用：{need}（备份 {bak.name}）")
+        log(f"已在 {proj.name} 里启用：{need}（备份 {bak.name}）" + ("；插件目录：" + str(SRC.parent) if link is None else ""))
     log("重新打开 UE 工程后，主菜单栏会出现「AI 动捕」")
