@@ -1,0 +1,108 @@
+{
+ "content_dir": "/Game/MetaHumans",
+ "pipeline": "CINEMATIC",
+ "shorts_color": [
+  0.92,
+  0.92,
+  0.89
+ ],
+ "actors": [
+  {
+   "name": "ChenZhen",
+   "role": "主角：陈真式，年轻精瘦，短黑发，约 1.75 米",
+   "body": {
+    "Masculine/Feminine": 0.05,
+    "Height": 175,
+    "Muscularity": 0.68,
+    "Fat": 0.3,
+    "Waist": 76,
+    "Across Shoulder": 40
+   },
+   "skin": {
+    "u": 0.5,
+    "v": 0.28
+   },
+   "grooms": {
+    "Hair": "WI_Hair_S_Clean",
+    "Eyebrows": "WI_Eyebrows_M_FlatThick",
+    "Eyelashes": "WI_Eyelashes_S_Fine"
+   },
+   "hair_melanin": 0.95,
+   "outfit": {
+    "item": "/MetaHumanCrowdContent/Outfits/Bottoms/OA_Shorts/WI_OA_Shorts",
+    "material_colors": {
+     "diffuse_color_1": [
+      0.85,
+      0.84,
+      0.8
+     ],
+     "diffuse_color_2": [
+      0.85,
+      0.84,
+      0.8
+     ],
+     "B_diffuse_color_1": [
+      0.85,
+      0.84,
+      0.8
+     ],
+     "C_color": [
+      0.85,
+      0.84,
+      0.8
+     ]
+    }
+   }
+  },
+  {
+   "name": "Fujita",
+   "role": "反派：藤田刚式，壮硕，光头，约 1.85 米",
+   "body": {
+    "Masculine/Feminine": 0.0,
+    "Height": 185,
+    "Muscularity": 0.85,
+    "Fat": 0.38,
+    "Chest": 118,
+    "Waist": 96,
+    "Neck": 44,
+    "Across Shoulder": 44
+   },
+   "skin": {
+    "u": 0.55,
+    "v": 0.36
+   },
+   "grooms": {
+    "Eyebrows": "WI_Eyebrows_M_Thick",
+    "Eyelashes": "WI_Eyelashes_S_Sparse",
+    "Beard": "WI_Beard_S_Stubble"
+   },
+   "hair_melanin": 0.95,
+   "outfit": {
+    "item": "/MetaHumanCrowdContent/Outfits/Bottoms/OA_Shorts/WI_OA_Shorts",
+    "material_colors": {
+     "diffuse_color_1": [
+      0.85,
+      0.84,
+      0.8
+     ],
+     "diffuse_color_2": [
+      0.85,
+      0.84,
+      0.8
+     ],
+     "B_diffuse_color_1": [
+      0.85,
+      0.84,
+      0.8
+     ],
+     "C_color": [
+      0.85,
+      0.84,
+      0.8
+     ]
+    }
+   }
+  }
+ ],
+ "_note": "body：数值≤1 为该参数范围内的比例，>1 为厘米。Masculine/Feminine 最小值一端为男性（UI 左侧）；outfit 来自 MetaHumanCrowdContent 插件（Outfits/Bottoms/OA_Shorts/WI_OA_Shorts，标准服装管线；CrowdWardrobeItems 下的同名素材是 Crowd 专用管线，电影级组装会跳过），colors 填参数名→[r,g,b]"
+}

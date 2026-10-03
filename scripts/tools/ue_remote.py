@@ -1,0 +1,65 @@
+"""从外部给正在运行的 UE 编辑器发 Python（UE Python 插件的 Remote Execution，工程里要开 bRemoteExecution）。
+
+    python ue_remote.py --project AIMocap_Demo nodes
+    python ue_remote.py --project AIMocap_Demo exec "print(unreal.SystemLibrary.get_engine_version())"
+    python ue_remote.py --project AIMocap_Demo file path/to/script.py [参数...]
+
+命令在编辑器的游戏线程里同步执行，长任务期间编辑器界面会停住；输出较多时请脚本自己写日志文件。"""
+import argparse
+import json
+import sys
+import time
+
+ENGINE_PY = "E:/Program Files/Epic Games/UE_5.8/Engine/Plugins/Experimental/PythonScriptPlugin/Content/Python"
+sys.path.insert(0, ENGINE_PY)
+import remote_execution as rx  # noqa: E402
+
+
+def find_node(r, project, wait):
+    t0 = time.time()
+    while time.time() - t0 < wait:
+        nodes = [n for n in r.remote_nodes if not project or n.get("project_name") == project]
+        if nodes:
+            return nodes[0]
+        time.sleep(0.5)
+    return None
+
+
+def main():
+    sys.stdout.reconfigure(encoding="utf-8")
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--project", default="", help="只连这个工程名的编辑器")
+    ap.add_argument("--wait", type=float, default=15, help="等编辑器出现的秒数")
+    ap.add_argument("cmd", choices=["nodes", "exec", "file"])
+    ap.add_argument("rest", nargs=argparse.REMAINDER)
+    a = ap.parse_args()
+
+    r = rx.RemoteExecution()
+    r.start()
+    try:
+        if a.cmd == "nodes":
+            time.sleep(min(a.wait, 3))
+            print(json.dumps(r.remote_nodes, ensure_ascii=False, indent=1))
+            return 0
+        node = find_node(r, a.project, a.wait)
+        if not node:
+            print(f"没有找到运行中的 UE 编辑器（工程 {a.project or '任意'}）：编辑器开着吗？工程里开了 Remote Execution 吗？")
+            return 2
+        r.open_command_connection(node["node_id"])
+        if a.cmd == "exec":
+            command = " ".join(a.rest)
+        else:
+            command = " ".join(f'"{x}"' if " " in x else x for x in a.rest)
+        res = r.run_command(command, unattended=True, exec_mode=rx.MODE_EXEC_FILE)
+        for o in res.get("output", []):
+            print(o.get("output", "").rstrip("\n"))
+        if not res.get("success"):
+            print("[失败]", res.get("result", ""))
+            return 1
+        return 0
+    finally:
+        r.stop()
+
+
+if __name__ == "__main__":
+    sys.exit(main())
