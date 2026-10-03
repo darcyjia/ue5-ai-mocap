@@ -7,6 +7,7 @@
 命令在编辑器的游戏线程里同步执行，长任务期间编辑器界面会停住；输出较多时请脚本自己写日志文件。"""
 import argparse
 import json
+import re
 import sys
 import time
 
@@ -66,7 +67,9 @@ def main():
         if a.cmd == "exec":
             command = " ".join(a.rest)
         else:
-            command = " ".join(f'"{x}"' if " " in x else x for x in a.rest)
+            # Git Bash 会把 /Game/... 这类参数改写成 <Git 安装目录>/Game/...，这里改回去
+            rest = [re.sub(r"^[A-Za-z]:/Program Files/Git(?=/(Game|Engine|Script)/)", "", x) for x in a.rest]
+            command = " ".join(f'"{x}"' if " " in x else x for x in rest)
         res = r.run_command(command, unattended=True, exec_mode=rx.MODE_EXEC_FILE)
         for o in res.get("output", []):
             print(o.get("output", "").rstrip("\n"))
