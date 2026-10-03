@@ -15,6 +15,21 @@ sys.path.insert(0, ENGINE_PY)
 import remote_execution as rx  # noqa: E402
 
 
+def free_port():
+    """命令通道由这边监听。默认 6776 常被 WSL/Hyper-V 的保留端口段占掉（WinError 10013），挑一个能绑定的。"""
+    import socket
+    for port in (6776, 16776, 26776, 36776, 0):
+        s = socket.socket()
+        try:
+            s.bind(("127.0.0.1", port))
+            return s.getsockname()[1]
+        except OSError:
+            continue
+        finally:
+            s.close()
+    raise RuntimeError("找不到可用端口")
+
+
 def find_node(r, project, wait):
     t0 = time.time()
     while time.time() - t0 < wait:
@@ -34,7 +49,9 @@ def main():
     ap.add_argument("rest", nargs=argparse.REMAINDER)
     a = ap.parse_args()
 
-    r = rx.RemoteExecution()
+    cfg = rx.RemoteExecutionConfig()
+    cfg.command_endpoint = ("127.0.0.1", free_port())
+    r = rx.RemoteExecution(cfg)
     r.start()
     try:
         if a.cmd == "nodes":
