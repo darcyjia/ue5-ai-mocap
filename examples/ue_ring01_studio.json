@@ -1,6 +1,5 @@
 {
  "Metahuman_export": {
-  "level_template": "/Game/Studio/L_Studio270_Hard",
   "place_cm": [
    -3.7,
    -526.1,
@@ -8,6 +7,6 @@
   ],
   "yaw": -180.0,
   "cameras": "blender/arena/cameras_ue.json",
-  "note": "硬调 270 度环形人像棚：scripts/blender/make_cyc.py 生成网格 + scripts/ue/studio_build.py --preset hard --cyc 2200,2000,200,290 --cyc-mesh SM_Cyc270_R22H20.fbx --cyc-glow 10（墙用自发光均匀打底，不用洗墙灯）"
+  "note": "影棚已直接搭进 L_ring01_studio（studio_build.py --here --preset hard --cyc 2200,2000,200,290 --cyc-mesh SM_Cyc270_R22H20.fbx --cyc-glow 10），灯在大纲 Studio/Lights 里手调；不要再加 level_template，否则重跑管线会叠一份棚"
  }
 }

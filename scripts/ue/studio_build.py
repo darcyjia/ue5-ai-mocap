@@ -1,6 +1,8 @@
 """摄影棚关卡（非 World Partition，可当素材关卡模板 / LevelInstance 用）：灰背景 + 白地板 + 人像布光 + 固定曝光。
 
     studio_build.py <关卡> [--preset portrait|drama|hard] [--ev 4.5] [--cyc R,H,缺口起,缺口止] [--cyc-mesh cyc.fbx] [--wash 坎德拉]
+    studio_build.py --here [同上参数]      直接搭进当前打开的关卡（比如角色关卡），物体归到大纲文件夹 Studio/*，
+                                           灯能直接选中手调；会先删掉当前关卡里的 Studio/* 物体和指向 /Game/Studio 的关卡实例
 
 例：
     studio_build.py /Game/Studio/L_Studio                                    一面背景墙的人像棚
@@ -54,7 +56,8 @@ PRESETS = {
 def args():
     a = sys.argv[1:]
     o = {"level": a[0] if a and not a[0].startswith("--") else "/Game/Studio/L_Studio",
-         "preset": "portrait", "ev": None, "cyc": None, "cyc_mesh": None, "wash": 0.0, "glow": 0.0}
+         "preset": "portrait", "ev": None, "cyc": None, "cyc_mesh": None, "wash": 0.0, "glow": 0.0,
+         "here": "--here" in a, "assets": "/Game/Studio"}
     for i, x in enumerate(a):
         if x == "--preset":
             o["preset"] = a[i + 1]
@@ -68,7 +71,12 @@ def args():
             o["glow"] = float(a[i + 1])
         elif x == "--wash":
             o["wash"] = float(a[i + 1])
+        elif x == "--assets":
+            o["assets"] = a[i + 1]
     return o
+
+
+SPAWNED = []   # 本次搭的物体（--here 时按类型归文件夹）
 
 
 def material(d, name, grey, rough, two_sided=False, glow=None):
@@ -103,6 +111,7 @@ def block(label, loc, scale, mat, rot=None):
     a.static_mesh_component.set_static_mesh(unreal.load_asset("/Engine/BasicShapes/Cube"))
     a.static_mesh_component.set_material(0, mat)
     a.set_actor_scale3d(scale)
+    SPAWNED.append(a)
     return a
 
 
@@ -126,6 +135,7 @@ def rect(label, loc, target, cd, w, h, shadows=True, barn=0.0, radius=3000.0, ra
         raytraced = shadows
     if raytraced:   # 面光源用光追软阴影：虚拟阴影贴图对面光的近似在腿间/裤内这类贴近处会发硬发黑
         c.set_editor_property("cast_raytraced_shadow", unreal.CastRayTracedShadow.ENABLED)
+    SPAWNED.append(a)
     return a
 
 
@@ -157,6 +167,8 @@ def cyclorama(R, H, g0, g1, grey, cove=300.0, seg=5.0, steps=6):
 
 def import_mesh(fbx, d):
     name = fbx.replace("\\", "/").rsplit("/", 1)[-1].rsplit(".", 1)[0]
+    if EAL.does_asset_exist(f"{d}/{name}"):
+        return unreal.load_asset(f"{d}/{name}")
     t = unreal.AssetImportTask()
     ui = unreal.FbxImportUI()
     ui.set_editor_property("import_mesh", True)
@@ -175,9 +187,18 @@ def main():
     o = args()
     lvl, p = o["level"], PRESETS[o["preset"]]
     ev = o["ev"] if o["ev"] is not None else p["ev"]
-    d = lvl.rsplit("/", 1)[0]
+    d = o["assets"] if o["here"] else lvl.rsplit("/", 1)[0]
     unreal.SystemLibrary.collect_garbage()
-    if EAL.does_asset_exist(lvl):          # 就地重建：关卡可能正被角色关卡的 LevelInstance 引用，删不掉
+    if o["here"]:                          # 搭进当前关卡：先清掉上次搭的 Studio/* 和指向棚关卡的关卡实例
+        lvl = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world().get_path_name().split(".")[0]
+        for a in eas.get_all_level_actors():
+            if str(a.get_folder_path()).startswith("Studio"):
+                eas.destroy_actor(a)
+            elif isinstance(a, unreal.LevelInstance):
+                wa = a.get_editor_property("world_asset")
+                if wa and wa.get_path_name().startswith(d + "/"):
+                    eas.destroy_actor(a)
+    elif EAL.does_asset_exist(lvl):          # 就地重建：关卡可能正被角色关卡的 LevelInstance 引用，删不掉
         les.load_level(lvl)
         for a in eas.get_all_level_actors():
             if not isinstance(a, unreal.WorldSettings) and a.get_class().get_name() != "Brush":   # 体积（如后期盒子）也是 Brush 子类，要删
@@ -197,6 +218,7 @@ def main():
             cyc.set_actor_label("Cyclorama")
             cyc.static_mesh_component.set_static_mesh(sm)
             cyc.static_mesh_component.set_material(0, material(d, "M_StudioCyc", 0.18, 0.9, True, o["glow"]))   # 双面：不依赖网格法线朝向
+            SPAWNED.append(cyc)
         else:
             cyclorama(R, H, g0, g1, grey)
         if o["wash"]:
@@ -236,6 +258,11 @@ def main():
         s.set_editor_property(k, v)
         s.set_editor_property("override_" + k, True)
     pp.settings = s
+    SPAWNED.append(pp)
+    if o["here"]:
+        for a in SPAWNED:
+            folder = "Studio/Lights" if isinstance(a, unreal.Light) else "Studio/Post" if isinstance(a, unreal.PostProcessVolume) else "Studio/Set"
+            a.set_folder_path(folder)
     les.save_current_level()
     shape = f"环形 {o['cyc'][0] / 100:.0f}m×{o['cyc'][1] / 100:.0f}m 缺口 {o['cyc'][2]:.0f}°–{o['cyc'][3]:.0f}°" if o["cyc"] else "单面墙"
     print(f"摄影棚 {lvl}：{shape}，布光 {o['preset']}，EV {ev}" + (f"，洗墙 {o['wash']:.0f}cd" if o["wash"] else ""))
