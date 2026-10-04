@@ -8,6 +8,6 @@
   ],
   "yaw": -180.0,
   "cameras": "blender/arena/cameras_ue.json",
-  "note": "硬调 270 度环形人像棚：scripts/blender/make_cyc.py 生成网格 + scripts/ue/studio_build.py --preset hard --cyc 2200,2000,200,290 --cyc-mesh SM_Cyc270_R22H20.fbx --wash 1200"
+  "note": "硬调 270 度环形人像棚：scripts/blender/make_cyc.py 生成网格 + scripts/ue/studio_build.py --preset hard --cyc 2200,2000,200,290 --cyc-mesh SM_Cyc270_R22H20.fbx --cyc-glow 10（墙用自发光均匀打底，不用洗墙灯）"
  }
 }

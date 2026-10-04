@@ -4,12 +4,13 @@
 
 例：
     studio_build.py /Game/Studio/L_Studio                                    一面背景墙的人像棚
-    studio_build.py /Game/Studio/L_Studio270_Hard --preset hard --cyc 2200,2000,200,290 --cyc-mesh SM_Cyc270_R22H20.fbx --wash 1200
+    studio_build.py /Game/Studio/L_Studio270_Hard --preset hard --cyc 2200,2000,200,290 --cyc-mesh SM_Cyc270_R22H20.fbx --cyc-glow 10
 
 坐标约定：原点 = 打斗中心，角色关卡把它作为 LevelInstance 放在打斗中心、不旋转。
 --cyc：环形无缝背景（cyclorama），半径 R、墙高 H（厘米），缺口角度区间（UE 偏航角，度）留给机位永远不看的方向，
        墙脚用 1/4 圆弧过渡到地板（看不到墙角线）。半径/缺口按运镜算：机位都在墙内、任何画面的视线都落在墙或地板上。
 --cyc-mesh：用 scripts/blender/make_cyc.py 生成的平滑环形网格（含墙脚圆弧和顶盖）代替方块拼的墙，墙脚不会有棱，仰拍不见黑。
+--cyc-glow：环形墙材质加自发光（≈cd/m²），墙面均匀暗灰、不见纯黑。比 --wash 好：洗墙灯在 22m 外的弧墙上会留光斑和直边暗区。
 --wash：环形棚墙离人物远，主光照不到，用几盏朝外的大柔光把墙洗成暗灰（不是纯黑）。
 预设：portrait 人像（主 900 / 辅 220 / 轮廓 700 / 背景 500，EV 4.5）
       drama    戏剧（辅 60 / 轮廓 1600 / 背景 180）
@@ -53,7 +54,7 @@ PRESETS = {
 def args():
     a = sys.argv[1:]
     o = {"level": a[0] if a and not a[0].startswith("--") else "/Game/Studio/L_Studio",
-         "preset": "portrait", "ev": None, "cyc": None, "cyc_mesh": None, "wash": 0.0}
+         "preset": "portrait", "ev": None, "cyc": None, "cyc_mesh": None, "wash": 0.0, "glow": 0.0}
     for i, x in enumerate(a):
         if x == "--preset":
             o["preset"] = a[i + 1]
@@ -63,16 +64,23 @@ def args():
             o["cyc"] = [float(v) for v in a[i + 1].split(",")]
         elif x == "--cyc-mesh":
             o["cyc_mesh"] = a[i + 1]
+        elif x == "--cyc-glow":
+            o["glow"] = float(a[i + 1])
         elif x == "--wash":
             o["wash"] = float(a[i + 1])
     return o
 
 
-def material(d, name, grey, rough, two_sided=False):
+def material(d, name, grey, rough, two_sided=False, glow=None):
+    """常量灰材质。glow 不为 None 时每次重建图表，自发光 = 底色 × glow（单位约等于 cd/m²），用于环形墙均匀的底亮度。"""
     path = f"{d}/{name}"
-    if EAL.does_asset_exist(path):
+    if EAL.does_asset_exist(path) and glow is None:
         return unreal.load_asset(path)
-    mat = unreal.AssetToolsHelpers.get_asset_tools().create_asset(name, d, unreal.Material, unreal.MaterialFactoryNew())
+    if EAL.does_asset_exist(path):
+        mat = unreal.load_asset(path)
+        MEL.delete_all_material_expressions(mat)
+    else:
+        mat = unreal.AssetToolsHelpers.get_asset_tools().create_asset(name, d, unreal.Material, unreal.MaterialFactoryNew())
     mat.set_editor_property("two_sided", two_sided)
     c = MEL.create_material_expression(mat, unreal.MaterialExpressionConstant3Vector, -300, 0)
     c.set_editor_property("constant", unreal.LinearColor(grey, grey, grey, 1))
@@ -80,6 +88,10 @@ def material(d, name, grey, rough, two_sided=False):
     r = MEL.create_material_expression(mat, unreal.MaterialExpressionConstant, -300, 200)
     r.set_editor_property("r", rough)
     MEL.connect_material_property(r, "", unreal.MaterialProperty.MP_ROUGHNESS)
+    if glow:
+        e = MEL.create_material_expression(mat, unreal.MaterialExpressionConstant3Vector, -300, 400)
+        e.set_editor_property("constant", unreal.LinearColor(grey * glow, grey * glow, grey * glow, 1))
+        MEL.connect_material_property(e, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
     MEL.recompile_material(mat)
     EAL.save_loaded_asset(mat, False)
     return mat
@@ -109,7 +121,7 @@ def rect(label, loc, target, cd, w, h, shadows=True, barn=0.0, radius=3000.0, ra
     c.set_editor_property("temperature", 5600.0)
     if barn:
         c.set_editor_property("barn_door_angle", barn)
-        c.set_editor_property("barn_door_length", 30.0)
+        c.set_editor_property("barn_door_length", 10.0)   # 短挡光板：保留聚光感，但光区边缘渐暗、没有多边形硬边
     if raytraced is None:
         raytraced = shadows
     if raytraced:   # 面光源用光追软阴影：虚拟阴影贴图对面光的近似在腿间/裤内这类贴近处会发硬发黑
@@ -184,7 +196,7 @@ def main():
             cyc = eas.spawn_actor_from_class(unreal.StaticMeshActor, V(0, 0, 0), unreal.Rotator(0, 0, 0))
             cyc.set_actor_label("Cyclorama")
             cyc.static_mesh_component.set_static_mesh(sm)
-            cyc.static_mesh_component.set_material(0, material(d, "M_StudioCyc", 0.18, 0.9, True))   # 双面：不依赖网格法线朝向
+            cyc.static_mesh_component.set_material(0, material(d, "M_StudioCyc", 0.18, 0.9, True, o["glow"]))   # 双面：不依赖网格法线朝向
         else:
             cyclorama(R, H, g0, g1, grey)
         if o["wash"]:
@@ -195,6 +207,12 @@ def main():
                 src = V(R * 0.5 * math.cos(a), R * 0.5 * math.sin(a), 600)     # 低位朝上打会在墙顶留光斑，这个位置墙面最匀
                 dst = V(R * math.cos(a), R * math.sin(a), 500)
                 rect(f"Wash_{k}", src, dst, o["wash"], 400, 400, False, 0.0, R * 2)
+            # 第二排低位洗墙灯（和上排错开）：补墙中段——上排只照到墙上半，墙脚靠地板反光，中间会断成一条暗带
+            for k, off in enumerate((-60, -20, 20, 60)):
+                a = mid + math.radians(off)
+                src = V(R * 0.6 * math.cos(a), R * 0.6 * math.sin(a), 100)
+                dst = V(R * math.cos(a), R * math.sin(a), 300)
+                rect(f"WashLow_{k}", src, dst, o["wash"] * 0.5, 400, 300, False, 0.0, R * 2)
     else:
         block("Floor", V(0, 0, -5), V(30, 30, 0.1), white)                 # 30m×30m，顶面在 z=0
         block("Backdrop", V(0, 700, 500), V(30, 0.1, 10), grey)            # 背景墙 30m 宽 10m 高
