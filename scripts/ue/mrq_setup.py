@@ -25,6 +25,7 @@ CVARS = {
     "r.Lumen.ScreenProbeGather.DownsampleFactor": 8, "r.Lumen.Reflections.DownsampleFactor": 1,
     "r.HairStrands.Visibility.MSAA.SamplePerPixel": 8,                        # MetaHuman 头发
     "r.ScreenPercentage": 100, "r.ViewDistanceScale": 50,
+    "r.HairStrands.Simulation": 0,   # 毛发物理在每个镜头切点会重置，头发从旧位置“甩”过来，运动模糊拖成残影；短发不需要模拟
 }
 
 
@@ -49,6 +50,9 @@ def make(name, res, temporal, quality, outdir):
     aa.engine_warm_up_count = 32                              # 每个镜头开拍前预热：Lumen / 毛发 / 运动模糊先稳定
     aa.render_warm_up_count = 32
     aa.use_camera_cut_for_warm_up = False
+    # 快门从帧开始采样：默认“帧中心”会让每个镜头第一帧的一半时间子采样落在上一个镜头里，成半透明叠影
+    cam = cfg.find_or_add_setting_by_class(unreal.MoviePipelineCameraSetting)
+    cam.set_editor_property("shutter_timing", unreal.MoviePipelineShutterTiming.FRAME_OPEN)
     g = cfg.find_or_add_setting_by_class(unreal.MoviePipelineGameOverrideSetting)
     g.cinematic_quality_settings = True
     g.texture_streaming = unreal.MoviePipelineTextureStreamingMethod.FULLY_LOAD
