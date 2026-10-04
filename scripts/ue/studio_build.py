@@ -13,7 +13,8 @@
 --wash：环形棚墙离人物远，主光照不到，用几盏朝外的大柔光把墙洗成暗灰（不是纯黑）。
 预设：portrait 人像（主 900 / 辅 220 / 轮廓 700 / 背景 500，EV 4.5）
       drama    戏剧（辅 60 / 轮廓 1600 / 背景 180）
-      hard     硬调（主光正侧 90° 1200 / 无辅光 / 轮廓后移 3000 / 无背景光，EV 4.8）
+      hard     硬调（主光正侧 90° 1200 / 托底补光 80 / 轮廓后移 3000 / 无背景光，EV 4.8）
+投影灯用光追软阴影（工程默认是虚拟阴影贴图）；后期盒子把 Lumen 最终收集/场景光照质量提到 2、命中光照。
 在编辑器里跑（scripts/tools/ue_remote.py）；关卡已存在就清空后就地重建（引用它的角色关卡不受影响）。"""
 import math
 import sys
@@ -43,6 +44,7 @@ PRESETS = {
         "Background": (V(0, 380, 40), 180.0, 100, 100, False, 70.0)}),
     "hard": dict(ev=4.8, lights={
         "Key": (V(-380, -20, 240), 1200.0, 120, 120, True, 80.0),        # 正侧 90°，挡光板收窄
+        "Fill": (V(320, -420, 160), 80.0, 300, 300, False, 0.0),         # 托底补光：约主光 1/16，保反差但暗部不死黑
         "RimL": (V(-200, 380, 260), 3000.0, 30, 200, True, 45.0),        # 轮廓光后移、加强
         "RimR": (V(200, 380, 260), 3000.0, 30, 200, True, 45.0)}),
 }
@@ -92,7 +94,7 @@ def block(label, loc, scale, mat, rot=None):
     return a
 
 
-def rect(label, loc, target, cd, w, h, shadows=True, barn=0.0, radius=3000.0):
+def rect(label, loc, target, cd, w, h, shadows=True, barn=0.0, radius=3000.0, raytraced=None):
     a = eas.spawn_actor_from_class(unreal.RectLight, loc, unreal.MathLibrary.find_look_at_rotation(loc, target))
     a.set_actor_label(label)
     c = a.get_component_by_class(unreal.RectLightComponent)
@@ -108,6 +110,10 @@ def rect(label, loc, target, cd, w, h, shadows=True, barn=0.0, radius=3000.0):
     if barn:
         c.set_editor_property("barn_door_angle", barn)
         c.set_editor_property("barn_door_length", 30.0)
+    if raytraced is None:
+        raytraced = shadows
+    if raytraced:   # 面光源用光追软阴影：虚拟阴影贴图对面光的近似在腿间/裤内这类贴近处会发硬发黑
+        c.set_editor_property("cast_raytraced_shadow", unreal.CastRayTracedShadow.ENABLED)
     return a
 
 
@@ -205,7 +211,10 @@ def main():
                  ("auto_exposure_min_brightness", ev), ("auto_exposure_max_brightness", ev),
                  ("auto_exposure_bias", 0.0),
                  ("local_exposure_highlight_contrast_scale", 0.7),
-                 ("vignette_intensity", 0.25)):
+                 ("vignette_intensity", 0.25),
+                 ("lumen_final_gather_quality", 2.0),            # 间接光更细，地板反光能进到夹缝
+                 ("lumen_scene_lighting_quality", 2.0),
+                 ("lumen_ray_lighting_mode", unreal.LumenRayLightingModeOverride.HIT_LIGHTING)):
         s.set_editor_property(k, v)
         s.set_editor_property("override_" + k, True)
     pp.settings = s
