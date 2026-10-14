@@ -3,6 +3,45 @@
 版本号：`主.次.修订`。改了阶段产物格式或配置项 → 次版本；修 bug、调阈值 → 修订号。
 发版：`git tag -a vX.Y.Z -m "说明" && git push origin vX.Y.Z`
 
+## v0.4.0 — 2026-10-14
+
+可以迁移到别的电脑：`setup` 自动配置路径，`doctor` 检查环境，即梦在插件里扫码登录。
+
+**即梦账号**
+- 新命令 `python -m aimocap dreamina status | login | check | logout`。login 用 OAuth 设备码：打开授权页，等抖音扫码，`--json` 只发起登录并打印授权信息（插件用）
+- 插件新增「即梦账号 / 连接…」：显示登录状态和余额，没连接时一键打开授权页，后台等扫码（最多 5 分钟），成功后报余额；可以退出账号。登录由 UE 进程发起，令牌存进用户自己的凭据库，绕开 Claude 桌面应用（MSIX）的凭据隔离
+- 生成视频、出构图板之前先检查即梦连接；没连接直接问要不要现在连接，不再让用户自己开 PowerShell
+- dreamina 路径自动查找：config → PATH → `~/bin/dreamina.exe`；都没有时给出官方安装命令
+
+**可迁移**
+- 新命令 `python -m aimocap setup`：扫描各盘 Program Files、Epic 启动器清单和 WSL，自动找到 Python / Blender / ffmpeg / dreamina / UE / GVHMR，写进 `config.local.toml`。还能用的旧路径会保留；`--project` / `--work-root` / `--render-root` 可以手动指定，`--install-plugin` 顺便装插件，`--install-tools` 建手型识别环境并下载手部模型
+- 新命令 `python -m aimocap doctor`：13 项检查（配置、工作目录、渲染目录、Python 包、手型环境、Blender、ffmpeg、WSL、GVHMR 环境和 6 个权重、UE 命令行、工程和插件、即梦），每项缺失都给修复办法；`--json` 给插件用。插件新增「环境检查…」
+- `config.toml` 不再含本机路径（移到 `config.local.toml`）；缺路径时提示运行 setup，不再 KeyError
+- 新增 `paths.render_root`：MRQ 输出目录不再写死 `G:/UE_Output`（没配置时用工程 Saved/MovieRenders）；`ue_remote.py` 按 `ue_cmd` 找引擎
+- 安装文档 `docs/INSTALL.md`（中文 + 英文简版）
+
+**运镜与场景**（v0.3.0 之后陆续加入）
+- 运镜：急推（snap），震动幅度可调（`shake` 可以写数字）
+- 预演可以放进外部场景（导入 UE 关卡 glTF，`--env-scale` 以原点缩放），两人整体放到指定位置；相机自动避让遮挡（换角度 / 升高 / 拉近）
+- 按 UE 工程覆盖设置 `input/ue.json`：场景关卡用关卡实例引用、角色和原机位放到指定位置、运镜版本；插件可以装到指定工程；网格缓存按工程分开
+- 画幅比例由 `--res` 决定，写进剪辑表；UE 相机胶片按比例、约束宽高比
+- 特写景深：导入运镜时读 `dof.json`（按脸部距离对焦 + 光圈）
+
+**渲染（MRQ）**
+- `mrq_setup.py` 影视级设置：标准 1080p（2.35 画面上下黑边）、16 次时间采样、H.265 mp4（不留序列帧），草稿版 + 队列；参数化（序列 / 关卡 / 素材名）
+- 快门改成帧开始（FRAME_OPEN）、关掉毛发模拟：修掉每个镜头切点第一帧的残影和头发拖影
+- 强制保存配置资产（直接改属性不会标脏）
+
+**MetaHuman 与 UE 远程控制**
+- `scripts/tools/ue_remote.py`：给运行中的编辑器发 Python（自动挑可用端口，避开 Hyper-V 保留段；`--project` 传工程名）
+- `mh_actors.py` 按 JSON 规格捏 MetaHuman 演员（体型、头发、服装）并组装；`mh_outfit.py` 换装（默认不脚本组装，避免把 Creator 里设的 8K 烘焙降回 2K）、改服装颜色；`mh_upgrade.py` 请求 8K 源贴图并重新组装
+- 编辑器里远程跑 ue 阶段、导入运镜；场景 glb 导入（编辑器或 commandlet）
+- `studio_build.py`：人像 / 戏剧 / 硬光预设影棚，270° 弧形背景墙（自发光），`--here` 直接搭进当前关卡
+
+**修复**
+- 重定向：每次新建一个手臂对齐姿态。在已有重定向器上重置姿态再对齐会算错（rec01：前臂偏 58°，手臂误差 1.1° → 14.6°）
+- 安装插件：非 NTFS 盘（exFAT）建不了目录链接时，改用工程的 AdditionalPluginDirectories
+
 ## v0.3.0 — 2026-10-01
 
 阶段顺序：generate → solve → clean → **hands → impact → face** → preview → fbx → ue → qc。首个生产素材 ring01（55 秒擂台戏，四段尾帧接力拼接）全流程跑通。
