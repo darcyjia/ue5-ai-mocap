@@ -30,7 +30,11 @@ def outputs(c, cfg):
 
 
 def _cli(cfg, args, logfile=None):
-    _, out = sh([cfg["paths"]["dreamina"], *args], logfile, check=False)
+    from ..dreamina import INSTALL_HINT, exe
+    path = exe(cfg)
+    if path is None:
+        raise SystemExit(INSTALL_HINT)
+    _, out = sh([path, *args], logfile, check=False)
     return extract_json(out) or {}, out
 
 
@@ -99,10 +103,10 @@ def run_(c, cfg, args):
         raise SystemExit(f"生成视频要花约 {est} 积分（余额 {credits(cfg)}）。确认后加 --allow-spend 重跑")
     before = credits(cfg)
     if before is None:
-        raise SystemExit("读不到即梦的登录状态，未提交任何任务（没有扣费）。\n"
-                         "如果是从 UE 插件发起的：即梦的登录令牌存在 Windows 凭据库里，而 Claude 桌面应用（MSIX）"
-                         "会把它启动的进程的凭据隔离起来；在 Claude 里登录过的令牌，UE 看不到。\n"
-                         "解决：从开始菜单打开普通的 PowerShell（不要从 Claude 里开），运行 dreamina login 扫码登录一次。")
+        raise SystemExit("还没连接即梦（或登录已过期），未提交任何任务（没有扣费）。\n"
+                         "解决：UE 菜单「AI 动捕 → 即梦账号 / 连接…」，或在普通终端运行 python -m aimocap dreamina login，"
+                         "用抖音扫码授权。\n"
+                         "注意：在 Claude 桌面应用（MSIX）里登录的令牌会被隔离，UE 和普通终端看不到。")
     log(f"生成视频：{g['model']} {g['resolution']} {g['duration']}s，预估 {est} 积分，当前余额 {before}")
     prompt = c.prompt.read_text(encoding="utf-8").strip()
     # 两类失败不扣费，自动重试（最多 2 次，不占 retries）：

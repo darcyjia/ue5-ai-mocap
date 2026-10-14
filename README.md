@@ -2,6 +2,8 @@
 
 用 Seedance 生成武打视频，GVHMR 解算双人动作，清理脚滑，重定向到 UE 5.8 的 MetaHuman，自动生成关卡序列和质检报告。个人使用。
 
+**新电脑先看 [docs/INSTALL.md](docs/INSTALL.md)**：装好依赖后运行 `python -m aimocap setup --project <工程.uproject> --write --install-plugin` 自动配置路径，再用 `python -m aimocap doctor` 检查。
+
 ## 快速开始
 
 ```bash
@@ -37,6 +39,8 @@ python -m aimocap test                    # 回归测试
 - **导入运镜（Blender 预演）…**：把 `blender/cameras_ue.json` 导成成片序列 `LS_<素材>_edit`（每次新建 `edit_<时间>` 目录，不覆盖旧版）
 - **受力修正…**：某个时间点（秒）的受击反应调幅度 / 删掉 / 补一下，写进 `input/impacts.json`，只重做受力、导出和 UE 部分（约 15 秒）
 - **查看受力检测…**：打开受力时间线（每一下打在哪、多大）
+- **环境检查…**：后台跑 `doctor`，弹出每项依赖的状态和修复办法
+- **即梦账号 / 连接…**：查看余额；没连接时打开授权页，抖音扫码即可（生成视频、出构图板前也会自动检查）
 - **任务状态 / 打开质检报告 / 打开工作目录 / 打开配置文件**
 
 插件是纯 Python（UE 5.8 自带 Python 插件），界面用 UE 的属性面板对话框。重活由系统 Python 跑本工具的命令行，UE 阶段在编辑器里运行（与命令行共用 `scripts/ue/ue_pipeline.py`）。
@@ -64,7 +68,7 @@ python -m aimocap test                    # 回归测试
 
 ## 配置（config.toml）
 
-- `[paths]`：各工具路径、UE 工程、WSL 发行版、GVHMR 目录
+- `[paths]`：各工具路径、UE 工程、WSL 发行版、GVHMR 目录、渲染输出目录。**本机路径只写在 `config.local.toml`**，由 `python -m aimocap setup --write` 自动探测生成
 - `[generate]`：分辨率（动捕源 480p 足够，1080p 实测没有改善）、时长、积分上限、失败重试次数
 - `[[person]]`：**按画面从左到右**指定每个人用哪个 MetaHuman 身体网格
 - `[ue] uniform_horizontal_scale`：两人使用统一的水平缩放（= 两人"目标骨盆高 / 源骨盆高"的平均），让步幅匹配目标角色的腿长，同时保持两人相对位置

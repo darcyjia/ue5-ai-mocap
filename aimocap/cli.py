@@ -7,6 +7,9 @@
   python -m aimocap status <素材>
   python -m aimocap test  [--update]                          回归测试
   python -m aimocap install-ue-plugin                          把编辑器插件链接进 UE 工程
+  python -m aimocap dreamina status|login|logout              即梦账号：查状态 / 扫码登录 / 退出
+  python -m aimocap setup [--write] [--project X.uproject]   新电脑初始化：探测工具路径，写 config.local.toml
+  python -m aimocap doctor                                     环境检查：缺什么、怎么补
 （插件内部用：quote / uejob / mark）
 阶段顺序：generate → solve → clean → hands → impact → face → preview → fbx → ue → qc
 """
@@ -130,6 +133,20 @@ def main(argv=None):
     s.add_argument("--project", help="装到哪个 .uproject（默认 config 的 ue_project）")
     s = sub.add_parser("test")
     s.add_argument("--update", action="store_true")
+    s = sub.add_parser("dreamina", help="即梦账号：status / login / check / logout")
+    s.add_argument("action", choices=["status", "login", "check", "logout"])
+    s.add_argument("--json", action="store_true", help="login：只发起登录并打印授权信息（插件用）")
+    s.add_argument("--device-code", help="check：login --json 返回的 device_code")
+    s.add_argument("--poll", type=int, default=300, help="等扫码授权的最长秒数")
+    s = sub.add_parser("setup", help="探测本机工具路径，写 config.local.toml")
+    s.add_argument("--write", action="store_true", help="写入（不加只预览）")
+    s.add_argument("--project", help="默认 UE 工程 .uproject（也决定用哪个版本的引擎）")
+    s.add_argument("--work-root", help="素材工作目录")
+    s.add_argument("--render-root", help="UE 渲染输出目录")
+    s.add_argument("--install-plugin", action="store_true", help="写完顺便把插件装进 --project 指定的工程")
+    s.add_argument("--install-tools", action="store_true", help="建手型识别环境 .venv-tools、下载手部模型")
+    s = sub.add_parser("doctor", help="环境检查")
+    s.add_argument("--json", action="store_true")
     a = ap.parse_args(argv)
     cfg = C.load(a.config)
     if a.cmd == "new":
@@ -156,3 +173,12 @@ def main(argv=None):
     elif a.cmd == "test":
         from .regression import run_tests
         sys.exit(run_tests(cfg, a.update))
+    elif a.cmd == "dreamina":
+        from . import dreamina
+        dreamina.cmd(cfg, a)
+    elif a.cmd == "setup":
+        from . import setup_cmd
+        setup_cmd.cmd(cfg, a)
+    elif a.cmd == "doctor":
+        from . import doctor
+        doctor.cmd(cfg, a)

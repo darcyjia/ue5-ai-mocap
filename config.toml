@@ -1,15 +1,12 @@
 # aimocap 配置。路径用正斜杠。
 
 [paths]
-work_root = "G:/claude/video/aimocap_work"          # 每条素材一个子目录
-dreamina = "C:/Users/xjia/bin/dreamina.exe"
-blender = "G:/Program Files/blender-4.5.13-windows-x64/blender.exe"
-ffmpeg = "C:/FFmpeg/bin/ffmpeg.exe"
-python = "C:/Python313/python.exe"                  # 带 numpy/scipy/matplotlib 的系统 Python（编辑器插件用它调本工具）
-ue_cmd = "E:/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe"
-ue_project = "H:/UE_Project/Metahuman_export/Metahuman_export.uproject"
-wsl_distro = "Ubuntu-24.04"
-gvhmr_dir = "~/mocap/GVHMR"                          # WSL 内路径
+# 本机路径不写在这里，放在 config.local.toml（不进仓库）。新电脑运行：
+#     python -m aimocap setup --project <你的.uproject> --write
+# 自动探测 Blender、ffmpeg、Python、UE、WSL 里的 GVHMR 等，再用 python -m aimocap doctor 检查。
+# 各项含义：work_root 素材工作目录 / render_root UE 渲染输出 / python 带 numpy scipy matplotlib 的系统 Python /
+# blender / ffmpeg / dreamina 即梦命令行 / ue_cmd UnrealEditor-Cmd.exe / ue_project 默认工程 /
+# wsl_distro 装 GVHMR 的 WSL 发行版 / gvhmr_dir WSL 里的 GVHMR 目录（如 ~/mocap/GVHMR）
 
 [generate]
 model = "seedance2.5"

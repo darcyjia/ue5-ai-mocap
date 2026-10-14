@@ -32,6 +32,30 @@ DEFAULTS = {
 }
 
 
+# 本机路径：放在 config.local.toml（不进仓库），由 `python -m aimocap setup` 自动探测生成。
+PATH_KEYS = {
+    "work_root": "素材工作目录（每条素材一个子目录）",
+    "render_root": "UE 渲染输出目录（MRQ 成片）",
+    "python": "带 numpy / scipy / matplotlib 的系统 Python（编辑器插件用它调本工具）",
+    "blender": "Blender 4.x 的 blender.exe",
+    "ffmpeg": "ffmpeg.exe",
+    "dreamina": "即梦命令行 dreamina.exe（只有生成视频要用）",
+    "ue_cmd": "UnrealEditor-Cmd.exe（命令行导入、渲染设置）",
+    "ue_project": "默认 UE 工程 .uproject",
+    "wsl_distro": "装了 GVHMR 的 WSL 发行版名",
+    "gvhmr_dir": "WSL 里 GVHMR 的目录",
+}
+
+
+def path(cfg, key):
+    """取 paths.<key>；没配置时给出明确提示，而不是 KeyError。"""
+    v = (cfg.get("paths") or {}).get(key)
+    if not v:
+        raise SystemExit(f"配置里还没有 paths.{key}（{PATH_KEYS.get(key, '')}）。\n"
+                         "先运行：python -m aimocap setup --write（自动探测本机路径，写进 config.local.toml）")
+    return v
+
+
 def _merge(a, b):
     out = dict(a)
     for k, v in b.items():

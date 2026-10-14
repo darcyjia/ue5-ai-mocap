@@ -81,14 +81,12 @@ def new_job():
         if not (Path(f.prompt_file.file_path).exists() and Path(f.plate_image.file_path).exists()):
             return _msg("AI 动捕", "请选编排提示词 txt 和构图板图片。")
         res = forms.RES_NAME[res_i]
+        if not _ensure_dreamina("生成视频"):
+            return
         q = core.cli_json(["quote", "--resolution", res, "--duration", str(f.duration)])
         if q["balance"] is None:
-            return _msg("AI 动捕", "读不到即梦的登录状态（没有提交，也没有扣费）。\n\n"
-                                   "即梦把登录令牌存在 Windows 凭据库里。如果当初是在 Claude 桌面应用里登录的，"
-                                   "令牌会被隔离在 Claude 里，UE 看不到。\n\n"
-                                   "解决：从开始菜单打开普通的 PowerShell（不要从 Claude 里开），运行\n"
-                                   "    C:\\Users\\xjia\\bin\\dreamina.exe login\n"
-                                   "用抖音扫码授权，然后回来重试（不用重启 UE）。")
+            return _msg("AI 动捕", "读不到即梦余额（没有提交，也没有扣费）。稍等几秒再试；"
+                                   "还不行就用菜单「即梦账号 / 连接…」重新连接。")
         if q["estimate"] > q["max_credits"]:
             return _msg("AI 动捕", f"预估 {q['estimate']} 积分，超过配置的上限 {q['max_credits']}。")
         if _msg("确认花费积分", f"用 Seedance 生成 {res}、{f.duration} 秒的视频：\n\n预估 {q['estimate']} 积分，"
@@ -310,6 +308,8 @@ def plates():
     clip = f.clip_name.strip()
     if not re.fullmatch(r"[A-Za-z0-9_]+", clip) or not Path(f.prompt_file.file_path).exists():
         return _msg("AI 动捕", "请填素材名（英文数字下划线）并选构图板提示词文件。")
+    if not _ensure_dreamina("出构图板"):
+        return
 
     def done(job, ok):
         if ok:
@@ -317,6 +317,122 @@ def plates():
         else:
             _msg("AI 动捕：失败", "\n".join(job.lines[-20:]))
     core.start(f"构图板 {clip}", clip, ["plate", clip, "--prompt", f.prompt_file.file_path, "--n", str(f.count)], done)
+
+
+# ---------------- 即梦账号 ----------------
+_LOGIN_JOB = None
+
+
+def _dreamina_status():
+    try:
+        return core.cli_json(["dreamina", "status"])
+    except Exception as ex:
+        return {"installed": False, "logged_in": False, "message": str(ex)[-600:]}
+
+
+def _ensure_dreamina(what):
+    """要用即梦之前调用：已连接返回 True；没装或没登录就说明原因，没登录时问要不要现在连接。"""
+    st = _dreamina_status()
+    if st.get("logged_in"):
+        return True
+    if not st.get("installed"):
+        _msg("AI 动捕：没有即梦命令行", st.get("message", ""))
+        return False
+    if _msg("AI 动捕：还没连接即梦", f"{what}要用即梦（Seedance），但现在还没连接即梦账号（或登录已过期）。\n\n"
+                                  "现在连接？会打开即梦授权网页，用抖音扫码确认即可。连接成功后再点一次就行。",
+            unreal.AppMsgType.YES_NO, YES) == YES:
+        connect_dreamina()
+    return False
+
+
+def connect_dreamina():
+    """OAuth 设备码登录：打开授权页，后台等扫码，成功后报余额。登录由 UE 进程发起，令牌存在用户自己的凭据库里。"""
+    global _LOGIN_JOB
+    if _LOGIN_JOB is not None and _LOGIN_JOB.running:
+        return _msg("AI 动捕", "正在等你在浏览器里扫码授权……\n（授权页关掉了的话，等这次超时后再点一次「连接」。）")
+    try:
+        info = core.cli_json(["dreamina", "login", "--json"])
+    except Exception as ex:
+        return _msg("AI 动捕：连接即梦失败", str(ex)[-1200:])
+    if info.get("already"):
+        return _msg("AI 动捕", f"已经连接即梦：余额 {info.get('credit')} 积分（会员 {info.get('vip_level')}）。")
+    import webbrowser
+    webbrowser.open(info["verification_uri"])
+
+    def done(job, ok):
+        global _LOGIN_JOB
+        _LOGIN_JOB = None
+        st = {}
+        for line in reversed(job.lines):
+            if line.startswith("{"):
+                try:
+                    st = json.loads(line)
+                except ValueError:
+                    pass
+                break
+        if st.get("logged_in"):
+            _msg("AI 动捕", f"已连接即梦：余额 {st.get('credit')} 积分（会员 {st.get('vip_level')}）。")
+        else:
+            _msg("AI 动捕：没有完成授权", "等待超时或授权被拒绝。可以再点一次「即梦账号 / 连接…」。\n\n"
+                                       + (st.get("message") or "\n".join(job.lines[-8:])))
+
+    _LOGIN_JOB = core.BackgroundJob("连接即梦", None, ["dreamina", "check", "--device-code", info["device_code"],
+                                                     "--poll", "300"], done, log_args=False)
+    code = f"\n授权页如果要求输入授权码，填：{info['user_code']}" if info.get("user_code") else ""
+    _msg("AI 动捕：连接即梦", "已在浏览器打开即梦授权页，用抖音扫码并确认授权。" + code +
+         "\n\n授权后会自动完成（最多等 5 分钟），可以先关掉这个窗口。\n"
+         f"如果浏览器没打开，手动访问：\n{info['verification_uri']}")
+
+
+def dreamina_account():
+    st = _dreamina_status()
+    if not st.get("installed"):
+        return _msg("AI 动捕：即梦账号", st.get("message", ""))
+    if not st.get("logged_in"):
+        if _msg("AI 动捕：即梦账号", "还没连接即梦（或登录已过期）。现在连接？", unreal.AppMsgType.YES_NO, YES) == YES:
+            connect_dreamina()
+        return
+    if _msg("AI 动捕：即梦账号", f"已连接即梦：余额 {st.get('credit')} 积分（会员 {st.get('vip_level')}）。\n"
+                              f"命令行：{st.get('path')}\n\n要退出这个账号吗？", unreal.AppMsgType.YES_NO, NO) == YES:
+        core.cli_json(["dreamina", "logout"])
+        _msg("AI 动捕", "已退出即梦账号。")
+
+
+# ---------------- 环境检查 ----------------
+_DOCTOR_JOB = None
+
+
+def doctor():
+    """后台跑 python -m aimocap doctor --json（约 20 秒），完成后弹出结果。"""
+    global _DOCTOR_JOB
+    if _DOCTOR_JOB is not None and _DOCTOR_JOB.running:
+        return _msg("AI 动捕", "环境检查正在进行，稍等。")
+    icon = {"ok": "✓", "warn": "!", "fail": "✗"}
+
+    def done(job, ok):
+        global _DOCTOR_JOB
+        _DOCTOR_JOB = None
+        items = None
+        for line in reversed(job.lines):
+            if line.startswith("["):
+                try:
+                    items = json.loads(line)
+                except ValueError:
+                    pass
+                break
+        if items is None:
+            return _msg("AI 动捕：环境检查失败", "\n".join(job.lines[-20:]))
+        rows = []
+        for i in items:
+            rows.append(f"{icon[i['level']]} {i['name']}：{i['detail']}")
+            if i["level"] != "ok" and i["fix"]:
+                rows.append(f"      → {i['fix']}")
+        n = {k: sum(i["level"] == k for i in items) for k in icon}
+        head = "全部就绪。" if not n["warn"] and not n["fail"] else f"{n['ok']} 项正常，{n['warn']} 项提醒，{n['fail']} 项缺失。"
+        _msg("AI 动捕：环境检查", head + "\n\n" + "\n".join(rows))
+
+    _DOCTOR_JOB = core.BackgroundJob("环境检查", None, ["doctor", "--json"], done)
+    unreal.log("[AI 动捕] 环境检查进行中（约 20 秒），完成后会弹出结果")
 
 
 # ---------------- 其它 ----------------

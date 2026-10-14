@@ -2,6 +2,7 @@ import time
 from pathlib import Path
 
 from .util import load_json, save_json
+from .config import path as cpath
 
 
 class Clip:
@@ -10,7 +11,7 @@ class Clip:
 
     def __init__(self, cfg, name):
         self.name = name
-        self.root = Path(cfg["paths"]["work_root"]) / name
+        self.root = Path(cpath(cfg, "work_root")) / name
         for d in self.DIRS:
             setattr(self, d, self.root / d)
         self.video = self.input / "video.mp4"

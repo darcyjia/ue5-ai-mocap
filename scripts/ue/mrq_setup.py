@@ -2,7 +2,7 @@
 和草稿版（HD、4 次采样、ProRes 422），外加一个渲染队列 Q_<素材>（草稿在前、正式在后）。
 用法：mrq_setup.py [<成片序列> <关卡> <素材名>]（不给参数就是 ring01 那套），命令行 commandlet 或编辑器里（ue_remote.py）都行：
   UnrealEditor-Cmd <uproject> -run=pythonscript -script="mrq_setup.py <SEQ> <MAP> <clip>"   （工程需启用 MovieRenderPipeline、AppleProResMedia）
-输出到 G:/UE_Output/<素材>/final 和 draft；给了素材名时配置资产名带 _<素材> 后缀，不同素材互不覆盖。
+输出到 <render_root>/<素材>/final 和 draft（render_root 来自 config.local.toml，没配置就放工程 Saved/MovieRenders）；给了素材名时配置资产名带 _<素材> 后缀，不同素材互不覆盖。
 相机胶片 2.35:1（36 × 15.32mm）且开着约束宽高比，输出 16:9 时上下自动黑边。"""
 import sys
 
@@ -15,6 +15,20 @@ ARGS = [a for a in sys.argv[1:] if a]
 SEQ, MAP, CLIP = ARGS[:3] if len(ARGS) >= 3 else (
     "/Game/AIMocap/ring01/edit_1001_210635/LS_ring01_edit.LS_ring01_edit", "/Game/AIMocap/ring01/L_ring01.L_ring01", "ring01")
 SUF = f"_{CLIP}" if len(ARGS) >= 3 else ""
+
+
+def render_root():
+    try:
+        from aimocap_ue import core          # 插件在的话读 aimocap 配置
+        r = (core.config().get("paths") or {}).get("render_root")
+        if r:
+            return r.rstrip("/")
+    except Exception:
+        pass
+    return unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_saved_dir()).rstrip("/") + "/MovieRenders"
+
+
+OUT = render_root()
 CVARS = {
     "r.MotionBlurQuality": 4, "r.MotionBlurSeparable": 1, "r.MotionBlur.Max": -1,
     "r.DepthOfFieldQuality": 4, "r.BloomQuality": 5, "r.Tonemapper.Quality": 5,
@@ -79,8 +93,8 @@ def make(name, res, temporal, quality, outdir):
     return cfg
 
 
-final = make(f"MRQ_Final_1080p_235{SUF}", (1920, 1080), 16, unreal.MoviePipelineEncodeQuality.EPIC, f"G:/UE_Output/{CLIP}/final")
-draft = make(f"MRQ_Draft_HD_235{SUF}", (1920, 1080), 4, unreal.MoviePipelineEncodeQuality.HIGH, f"G:/UE_Output/{CLIP}/draft")
+final = make(f"MRQ_Final_1080p_235{SUF}", (1920, 1080), 16, unreal.MoviePipelineEncodeQuality.EPIC, f"{OUT}/{CLIP}/final")
+draft = make(f"MRQ_Draft_HD_235{SUF}", (1920, 1080), 4, unreal.MoviePipelineEncodeQuality.HIGH, f"{OUT}/{CLIP}/draft")
 q = None
 try:
     q = unreal.load_asset(f"{DIR}/Q_{CLIP}") or at.create_asset(f"Q_{CLIP}", DIR, unreal.MoviePipelineQueue, None)

@@ -44,7 +44,11 @@ def config():
 
 
 def work_root():
-    return Path(config()["paths"]["work_root"])
+    w = (config().get("paths") or {}).get("work_root")
+    if not w:
+        raise RuntimeError("aimocap 还没配置本机路径。先在命令行运行：python -m aimocap setup --project <本工程.uproject> --write\n"
+                           "然后用菜单「环境检查…」确认。")
+    return Path(w)
 
 
 def clip_dir(name):
@@ -83,7 +87,7 @@ def cli_json(args):
 class BackgroundJob:
     """后台跑 `python -m aimocap …`，每帧把输出转到 Output Log；结束后在主线程回调 on_done(job, ok)。"""
 
-    def __init__(self, title, clip, args, on_done):
+    def __init__(self, title, clip, args, on_done, log_args=True):
         self.title, self.clip, self.on_done = title, clip, on_done
         self.lines, self.stage, self.t0 = [], "启动", time.time()
         self.q = queue.Queue()
@@ -92,7 +96,7 @@ class BackgroundJob:
         self.reader = threading.Thread(target=self._read, daemon=True)
         self.reader.start()
         self.handle = unreal.register_slate_post_tick_callback(self._tick)
-        unreal.log(f"[AI 动捕] 开始：{title}（{' '.join(args)}）")
+        unreal.log(f"[AI 动捕] 开始：{title}" + (f"（{' '.join(args)}）" if log_args else ""))   # 登录的设备码不进日志
 
     @property
     def running(self):

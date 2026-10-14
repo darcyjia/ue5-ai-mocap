@@ -2,6 +2,7 @@
 import shutil
 
 from ..util import SCRIPTS, file_sig, run as sh
+from ..config import path as cpath
 
 B = SCRIPTS / "blender"
 
@@ -17,7 +18,7 @@ def outputs(c, cfg):
 
 
 def run_(c, cfg):
-    bl = cfg["paths"]["blender"]
+    bl = cpath(cfg, "blender")
     blend = c.blender / "preview.blend"
     sh([bl, "-b", "--factory-startup", "--python-exit-code", "1", "--python", B / "build_blend.py", "--",
          "--npz-dir", c.impact, "--out", blend], c.logs / "preview_build.log")
@@ -26,7 +27,7 @@ def run_(c, cfg):
     sh([bl, "-b", blend, "--python-exit-code", "1", "--python", B / "render_preview.py", "--", "--out-dir", c.blender],
         c.logs / "preview_render.log")
     fps = 24
-    sh([cfg["paths"]["ffmpeg"], "-v", "error", "-y", "-i", c.video,
+    sh([cpath(cfg, "ffmpeg"), "-v", "error", "-y", "-i", c.video,
          "-framerate", fps, "-i", c.blender / "anim_orig" / "f_%04d.png",
          "-framerate", fps, "-i", c.blender / "anim_side" / "f_%04d.png",
          "-filter_complex", "[0:v]scale=560:420,setsar=1,fps=24[a];[1:v]scale=560:420,setsar=1[b];"

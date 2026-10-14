@@ -7,6 +7,7 @@ import subprocess
 import numpy as np
 
 from ..util import SCRIPTS, file_sig, load_json, log, run as sh, save_json
+from ..config import path as cpath
 
 
 def persons(c, cfg):
@@ -46,7 +47,7 @@ def extract_audio(c, cfg):
         return str(wav)
     c.ue.mkdir(parents=True, exist_ok=True)
     wav.unlink(missing_ok=True)
-    code, _ = sh([cfg["paths"]["ffmpeg"], "-v", "error", "-y", "-i", c.video, "-vn", "-ar", "48000", "-ac", "2",
+    code, _ = sh([cpath(cfg, "ffmpeg"), "-v", "error", "-y", "-i", c.video, "-vn", "-ar", "48000", "-ac", "2",
                   "-c:a", "pcm_s16le", wav], c.logs / "audio.log", check=False)
     if code != 0 or not wav.exists() or wav.stat().st_size < 1000:
         log("视频没有音轨，序列里不加声音")
@@ -88,8 +89,7 @@ def run(c, cfg, args):
         raise SystemExit("UE 编辑器正在运行：请关闭后再用命令行跑 ue 阶段，或者在编辑器里用「AI 动捕」菜单")
     build_job(c, cfg)
     (c.ue / "result.json").unlink(missing_ok=True)
-    p = cfg["paths"]
-    _, out = sh([p["ue_cmd"], p["ue_project"], "-run=pythonscript",
+    _, out = sh([cpath(cfg, "ue_cmd"), cpath(cfg, "ue_project"), "-run=pythonscript",
                  f"-script={(SCRIPTS / 'ue' / 'ue_commandlet.py').as_posix()}", "-unattended", "-nop4", "-nosplash",
                  "-NoSound", "-stdout", "-FullStdOutLogOutput"], c.logs / "ue.log",
                 env={"AIMOCAP_JOB": str(c.ue / "job.json")}, check=False)

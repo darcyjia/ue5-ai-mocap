@@ -10,6 +10,8 @@ ITEMS = [
     ("Info", "impacts", "查看受力检测…", "打开某个素材的受力时间线（每一下打在哪、多大）", "open_impacts()"),
     ("Info", "hands", "查看手型识别…", "打开某个素材的手型时间线（自动识别出的拳/半握/掌）", "open_hands()"),
     ("Run", "edit", "导入运镜（Blender 预演）…", "把 Blender 预演的镜头导进 UE：成片序列 + 每个镜头一个子序列（相机、镜头切换、表演）", "import_edit()"),
+    ("Info", "doctor", "环境检查…", "检查 Python、Blender、ffmpeg、WSL 里的 GVHMR、即梦等是否就绪，缺什么怎么补", "doctor()"),
+    ("Info", "dreamina", "即梦账号 / 连接…", "查看即梦（Seedance）登录状态和余额；没连接时用抖音扫码授权", "dreamina_account()"),
     ("Info", "status", "任务状态", "查看后台任务的进度和最近输出", "status()"),
     ("Info", "report", "打开质检报告…", "打开某个素材的 qc/report.html", "open_report()"),
     ("Info", "work", "打开工作目录", "打开 aimocap_work", "open_work()"),

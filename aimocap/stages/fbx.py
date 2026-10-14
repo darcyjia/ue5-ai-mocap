@@ -1,5 +1,6 @@
 """阶段 fbx：Blender 导出 UE 用的 FBX（每人一个，p0.fbx / p1.fbx）。"""
 from ..util import SCRIPTS, file_sig, run as sh
+from ..config import path as cpath
 
 
 def params(c, cfg):
@@ -13,7 +14,7 @@ def outputs(c, cfg):
 
 
 def run(c, cfg, args):
-    _, out = sh([cfg["paths"]["blender"], "-b", "--factory-startup", "--python-exit-code", "1", "--python",
+    _, out = sh([cpath(cfg, "blender"), "-b", "--factory-startup", "--python-exit-code", "1", "--python",
                  SCRIPTS / "blender" / "export_fbx.py", "--", "--npz-dir", c.impact, "--out-dir", c.fbx],
                 c.logs / "fbx.log")
     return {"exported": [l.split("@@ ")[1] for l in out.splitlines() if "@@ exported" in l]}

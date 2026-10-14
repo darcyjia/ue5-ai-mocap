@@ -11,7 +11,25 @@ import re
 import sys
 import time
 
-ENGINE_PY = "E:/Program Files/Epic Games/UE_5.8/Engine/Plugins/Experimental/PythonScriptPlugin/Content/Python"
+def engine_py():
+    """UE 自带的 remote_execution.py 所在目录：按 aimocap 配置里的 ue_cmd 找引擎，或用环境变量 UE_ENGINE_DIR。"""
+    import os
+    import tomllib
+    from pathlib import Path
+    root = Path(__file__).resolve().parents[2]
+    eng = os.environ.get("UE_ENGINE_DIR")
+    if not eng:
+        for name in ("config.toml", "config.local.toml"):
+            f = root / name
+            if f.exists():
+                eng = (tomllib.loads(f.read_text(encoding="utf-8")).get("paths") or {}).get("ue_cmd") or eng
+        eng = str(Path(eng).parents[2]) if eng else None          # …/Engine/Binaries/Win64/UnrealEditor-Cmd.exe → …/Engine
+    if not eng:
+        raise SystemExit("找不到 UE 引擎：先运行 python -m aimocap setup --write，或设环境变量 UE_ENGINE_DIR=<…/Engine>")
+    return str(Path(eng) / "Plugins/Experimental/PythonScriptPlugin/Content/Python")
+
+
+ENGINE_PY = engine_py()
 sys.path.insert(0, ENGINE_PY)
 import remote_execution as rx  # noqa: E402
 
