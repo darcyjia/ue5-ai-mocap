@@ -14,6 +14,7 @@ Body 组件。这样头、衣服、头发都在（模板式 spawnable 拿不到�
 import json
 import math
 import os
+import time
 
 import unreal
 
@@ -281,7 +282,13 @@ def retarget(p, cd, k, kh):
     r.set_preview_mesh(S, p["mesh"])
     r.set_preview_mesh(T, p["tmesh"])
     r.auto_map_chains(unreal.AutoMapChainType.EXACT, True)
-    r.reset_retarget_pose(r.get_current_retarget_pose_name(T), [], T)
+    # 每次新建一个对齐姿态再只对齐手臂。在已有重定向器上 reset_retarget_pose 后再对齐会算错
+    # （2026-10-11 rec01 实测：上臂偏移 0°、前臂 58°，手臂误差 1.1°→14.6°）；新建姿态与全新重定向器结果一致。
+    old = str(r.get_current_retarget_pose_name(T))
+    pose = r.create_retarget_pose(f"ArmAlign_{time.strftime('%Y%m%d_%H%M%S')}", T)
+    r.set_current_retarget_pose(pose, T)
+    if old != "Default Pose":
+        r.remove_retarget_pose(old, T)
     r.auto_align_bones(ARM, unreal.RetargetAutoAlignMethod.CHAIN_TO_CHAIN, T)      # 只对齐手臂！
     for i in range(r.get_num_retarget_ops()):
         if str(r.get_op_name(i)) == "Pelvis Motion":
