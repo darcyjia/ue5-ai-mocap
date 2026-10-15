@@ -145,3 +145,7 @@ curl -L -o models/hand_landmarker.task https://storage.googleapis.com/mediapipe-
 - Blender 的 Python 出错时退出码仍为 0：所有调用都加了 `--python-exit-code 1`
 - 通过 Python subprocess 调用 wsl.exe，不经过 Git Bash，避免了路径改写和多行脚本 CR 问题
 - SMPL/SMPL-X 为非商用研究许可，仅限个人使用
+
+## 许可
+
+代码：MIT（[LICENSE](LICENSE)）。依赖的 GVHMR、SMPL-X 等第三方组件按各自许可，见 [THIRD_PARTY.md](THIRD_PARTY.md)。

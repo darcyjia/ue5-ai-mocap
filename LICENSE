@@ -19,14 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-Third-party components are NOT covered by this license and are not included in
-this repository. They are downloaded/installed separately and keep their own terms:
-
-- GVHMR (https://github.com/zju3dv/GVHMR): non-commercial research license.
-- SMPL / SMPL-X body models (https://smpl-x.is.tue.mpg.de/): non-commercial license, registration required.
-- MediaPipe hand landmarker model: Apache License 2.0.
-- Dreamina / Seedance: paid online service, subject to its own terms.
-- Unreal Engine and MetaHuman: Epic Games EULA.
