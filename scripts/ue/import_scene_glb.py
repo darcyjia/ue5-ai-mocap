@@ -3,7 +3,7 @@
     import_scene_glb.py <glb> <资产目录> <关卡路径> [缩放=1.0]          命令行 commandlet，一次做完
     import_scene_glb.py start <glb> <资产目录> <关卡路径>              编辑器里（异步）：先发起导入
     import_scene_glb.py finish <资产目录> <关卡路径> [缩放]            编辑器里：导入完成后缩放、补灯光、保存
-    例：import_scene_glb.py G:/UE_Output/world_martial_arts_tournament.glb /Game/Arena/Budokai /Game/Arena/L_Budokai 0.7
+    例：import_scene_glb.py D:/scenes/arena.glb /Game/Arena/Budokai /Game/Arena/L_Budokai 0.7
 
 Interchange 的 import_scene 会把网格/材质/贴图放进资产目录，同时把场景里的物体摆进当前关卡。
 缩放：整个场景按比例缩（根物体的位置和缩放一起乘）。再补上太阳、天光、大气、雾（新关卡是空的）。

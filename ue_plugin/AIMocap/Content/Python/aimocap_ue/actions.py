@@ -254,8 +254,8 @@ def open_impacts():
         core.open_path(tl) if tl.exists() else _msg("AI 动捕", f"{tl} 不存在（这个素材还没跑受力阶段）。")
 
 
-def import_edit():
-    folder = _pick_clip("AI 动捕：导入运镜（Blender 预演）")
+def import_edit(folder=None):
+    folder = folder or _pick_clip("AI 动捕：导入运镜（Blender 预演）")
     if not folder:
         return
     proj = Path(unreal.Paths.get_project_file_path()).stem
@@ -285,6 +285,89 @@ def import_edit():
                     "成片序列里是镜头轨道，双击某个镜头可以进去改相机；表演（两个角色的动作和表情）"
                     "是 LS_" + clip + " 的副本，原来的序列没动。")
 
+
+def previz():
+    """后台跑 python -m aimocap previz：自动镜头表 → Blender 预演 → 导出 UE 相机和景深，完成后可以直接导入运镜。"""
+    if not _guard():
+        return
+    folder = _pick_clip("AI 动捕：运镜预演（Blender）")
+    if not folder:
+        return
+    clip = folder.name
+    if folder.parent.resolve() != core.work_root().resolve():
+        return _msg("AI 动捕", f"请选工作目录 {core.work_root()} 下的素材文件夹。")
+    if not (folder / "ue" / "export" / "meshes_p0.json").exists():
+        return _msg("AI 动捕", f"「{clip}」还没有在 UE 里重定向过（缺 ue/export 下的角色网格）。\n"
+                               "先用「新建动捕」或「换角色 / 重做重定向」跑一次 UE 部分。")
+    args = ["previz", clip]
+    shots = folder / "blender" / "previz" / "shots.json"
+    if shots.exists():
+        r = _msg("AI 动捕：运镜预演", "这个素材已经有镜头表了（可能手改过）。\n\n"
+                                   "是：按受力检测重新生成镜头表（旧的会备份）\n否：沿用现有镜头表\n取消：不做",
+                 unreal.AppMsgType.YES_NO_CANCEL, NO)
+        if r == unreal.AppReturnType.CANCEL:
+            return
+        if r == YES:
+            args.append("--auto-shots")
+
+    def done(job, ok):
+        if not ok:
+            return _msg("AI 动捕：运镜预演失败", "\n".join(job.lines[-25:]))
+        pv = folder / "blender" / "previz"
+        video = pv / f"previz_{clip}.mp4"
+        n = 0
+        try:
+            n = len(json.loads((pv / "edl.json").read_text(encoding="utf-8"))["shots"])
+        except Exception:
+            pass
+        if video.exists():
+            core.open_path(video)
+        if _msg("AI 动捕：运镜预演完成", f"{n} 个镜头，预演视频已打开：\n{video}\n\n"
+                                     f"镜头表在 {pv / 'shots.json'}，可以手改后再跑一次。\n\n"
+                                     "现在把运镜导入 UE？", unreal.AppMsgType.YES_NO, YES) == YES:
+            import_edit(folder)
+
+    core.start(f"运镜预演 {clip}", clip, args, done)
+    _msg("AI 动捕", f"已在后台开始做「{clip}」的运镜预演：自动镜头表 → Blender 预演渲染 → 导出相机。\n"
+                    "15 秒的素材大约几分钟，进度在 Output Log（搜「AI 动捕」）或「任务状态」。")
+
+
+def render_setup():
+    """给某个素材最新的成片序列建 MRQ 正式版 / 草稿版配置和队列 Q_<素材>，可以直接开始渲染。"""
+    if not _guard():
+        return
+    folder = _pick_clip("AI 动捕：渲染设置")
+    if not folder:
+        return
+    clip = folder.name
+    cd = f"{core.config()['ue']['content_root']}/{clip}"
+    eal = unreal.EditorAssetLibrary
+    edits = sorted(p.split(".")[0] for p in eal.list_assets(cd, recursive=True, include_folder=False)
+                   if p.split("/")[-1].split(".")[0] == f"LS_{clip}_edit")
+    if not edits:
+        return _msg("AI 动捕", f"「{clip}」还没有成片序列 LS_{clip}_edit：先做「运镜预演」再「导入运镜」。")
+    seq = edits[-1]                                   # edit_<月日_时分秒> 目录名按时间排序，最后一个最新
+    level = f"{cd}/L_{clip}"
+    import runpy
+    import sys
+    argv = sys.argv
+    sys.argv = ["mrq_setup.py", f"{seq}.{seq.split('/')[-1]}", f"{level}.L_{clip}", clip]
+    try:
+        runpy.run_path(str(core.REPO / "scripts" / "ue" / "mrq_setup.py"), run_name="__main__")
+    except Exception as ex:
+        return _msg("AI 动捕：渲染设置失败", f"{ex}\n\n需要启用 Movie Render Queue 插件。")
+    finally:
+        sys.argv = argv
+    out = (core.config().get("paths") or {}).get("render_root") or "工程 Saved/MovieRenders"
+    if _msg("AI 动捕：渲染设置", f"已生成渲染队列 /Game/Cinematics/MRQ/Q_{clip}：\n"
+                               "  草稿：HD、4 次采样（先看效果）\n  正式：1080p 宽银幕、16 次采样、景深、H.265 mp4\n"
+                               f"序列：{seq}\n输出：{out}/{clip}/draft 和 final\n\n"
+                               "现在开始渲染（草稿和正式依次渲）？渲染期间编辑器不能操作。",
+            unreal.AppMsgType.YES_NO, NO) != YES:
+        return _msg("AI 动捕", "之后可以在 Window → Cinematics → Movie Render Queue 里加载这个队列再渲染。")
+    sub = unreal.get_editor_subsystem(unreal.MoviePipelineQueueSubsystem)
+    sub.load_queue(unreal.load_asset(f"/Game/Cinematics/MRQ/Q_{clip}"), prompt_on_replacing_dirty_queue=False)
+    sub.render_queue_with_executor(unreal.MoviePipelinePIEExecutor)
 
 def open_hands():
     folder = _pick_clip("AI 动捕：查看手型识别")

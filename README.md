@@ -1,13 +1,15 @@
 # aimocap：AI 视频 → 双人动捕 → MetaHuman
 
-用 Seedance 生成武打视频，GVHMR 解算双人动作，清理脚滑，重定向到 UE 5.8 的 MetaHuman，自动生成关卡序列和质检报告。个人使用。
+用 Seedance 生成武打视频，GVHMR 解算双人动作，清理脚滑，重定向到 UE 5.8 的 MetaHuman，自动生成关卡序列和质检报告；还能自动出港片风格的运镜预演、一键渲染。
+
+> 目前只在作者自己的电脑上测试过（Windows 11 + RTX 3090 + UE 5.8）。遇到 bug 请提 [Issue](https://github.com/darcyjia/ue5-ai-mocap/issues)，会持续修。
 
 **新电脑先看 [docs/INSTALL.md](docs/INSTALL.md)**：装好依赖后运行 `python -m aimocap setup --project <工程.uproject> --write --install-plugin` 自动配置路径，再用 `python -m aimocap doctor` 检查。
 
 ## 快速开始
 
 ```bash
-cd G:/claude/video/aimocap
+cd ue5-ai-mocap
 
 # 已有视频
 python -m aimocap new fight_01 --video 某视频.mp4
@@ -36,9 +38,11 @@ python -m aimocap test                    # 回归测试
 - **换角色 / 重做重定向…**：已解算的素材换 MetaHuman，只重做 UE 部分（几十秒）
 - **手型修正…**：把某人某只手在某段时间（秒）改成拳 / 半握 / 掌 / 放松，写进 `input/hands.json`，只重做手型、导出和 UE 部分（不重新识别）
 - **查看手型识别…**：打开素材的手型时间线图
+- **运镜预演（Blender）…**：按受力检测自动出九十年代港片风格的镜头表（开场定格、打中就切、侧面跟拍 / 过肩 / 低机位 / 受击近景轮换、关键一击两个角度、结尾环绕，不越轴），Blender 渲染 2.35:1 预演视频，导出 UE 相机和景深 `dof.json`；完成后可以直接导入运镜。镜头表 `blender/previz/shots.json` 可以手改后重跑。命令行：`python -m aimocap previz <素材>`
 - **导入运镜（Blender 预演）…**：把 `blender/cameras_ue.json` 导成成片序列 `LS_<素材>_edit`（每次新建 `edit_<时间>` 目录，不覆盖旧版）
 - **受力修正…**：某个时间点（秒）的受击反应调幅度 / 删掉 / 补一下，写进 `input/impacts.json`，只重做受力、导出和 UE 部分（约 15 秒）
 - **查看受力检测…**：打开受力时间线（每一下打在哪、多大）
+- **渲染设置…**：给素材最新的成片序列建 MRQ 草稿（HD、4 次采样）和正式（1080p 宽银幕、16 次采样、景深、H.265）配置和队列 `Q_<素材>`，可以直接开始渲染；输出到 `paths.render_root`
 - **环境检查…**：后台跑 `doctor`，弹出每项依赖的状态和修复办法
 - **即梦账号 / 连接…**：查看余额；没连接时打开授权页，抖音扫码即可（生成视频、出构图板前也会自动检查）
 - **任务状态 / 打开质检报告 / 打开工作目录 / 打开配置文件**

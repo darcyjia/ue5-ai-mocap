@@ -10,6 +10,7 @@
   python -m aimocap dreamina status|login|logout              即梦账号：查状态 / 扫码登录 / 退出
   python -m aimocap setup [--write] [--project X.uproject]   新电脑初始化：探测工具路径，写 config.local.toml
   python -m aimocap doctor                                     环境检查：缺什么、怎么补
+  python -m aimocap previz <素材> [--auto-shots]              运镜预演：自动镜头表 → Blender 预演 → UE 相机和景深
 （插件内部用：quote / uejob / mark）
 阶段顺序：generate → solve → clean → hands → impact → face → preview → fbx → ue → qc
 """
@@ -147,6 +148,12 @@ def main(argv=None):
     s.add_argument("--install-tools", action="store_true", help="建手型识别环境 .venv-tools、下载手部模型")
     s = sub.add_parser("doctor", help="环境检查")
     s.add_argument("--json", action="store_true")
+    s = sub.add_parser("previz", help="运镜预演：镜头表 → Blender 预演 → 导出 UE 相机和景深")
+    s.add_argument("clip")
+    s.add_argument("--res", default="1128x480", help="预演渲染分辨率（宽x高，2.35:1 = 1128x480）")
+    s.add_argument("--auto-shots", action="store_true", help="按受力检测重新生成镜头表（已有的会备份）")
+    s.add_argument("--no-render", action="store_true", help="只出相机，不渲染预演视频（快很多）")
+    s.add_argument("--force", action="store_true", help="重建 Blender 预演场景")
     a = ap.parse_args(argv)
     cfg = C.load(a.config)
     if a.cmd == "new":
@@ -182,3 +189,6 @@ def main(argv=None):
     elif a.cmd == "doctor":
         from . import doctor
         doctor.cmd(cfg, a)
+    elif a.cmd == "previz":
+        from . import previz
+        previz.run(cfg, a.clip, a)

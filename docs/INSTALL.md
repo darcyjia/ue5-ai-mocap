@@ -29,8 +29,8 @@
 ## 3. 初始化
 
 ```bash
-git clone <仓库地址> aimocap
-cd aimocap
+git clone https://github.com/darcyjia/ue5-ai-mocap.git
+cd ue5-ai-mocap
 python -m aimocap setup --project D:/MyProj/MyProj.uproject            # 预览探测结果
 python -m aimocap setup --project D:/MyProj/MyProj.uproject --write --install-plugin
 python -m aimocap setup --install-tools                                # 手型识别环境 + 手部模型
