@@ -2,6 +2,12 @@
 
 用 Seedance 生成武打视频，GVHMR 解算双人动作，清理脚滑，重定向到 UE 5.8 的 MetaHuman，自动生成关卡序列和质检报告；还能自动出港片风格的运镜预演、一键渲染。
 
+## 📺 演示教程
+
+从安装到出片的完整演示（13 分钟，B 站）：**[https://www.bilibili.com/video/BV1VqJt6nEFD/](https://www.bilibili.com/video/BV1VqJt6nEFD/)**
+
+[![AI 动捕插件 保姆级教程](docs/images/tutorial_cover.jpg)](https://www.bilibili.com/video/BV1VqJt6nEFD/)
+
 > 目前只在作者自己的电脑上测试过（Windows 11 + RTX 3090 + UE 5.8）。遇到 bug 请提 [Issue](https://github.com/darcyjia/ue5-ai-mocap/issues)，会持续修。
 
 **新电脑先看 [docs/INSTALL.md](docs/INSTALL.md)**：装好依赖后运行 `python -m aimocap setup --project <工程.uproject> --write --install-plugin` 自动配置路径，再用 `python -m aimocap doctor` 检查。

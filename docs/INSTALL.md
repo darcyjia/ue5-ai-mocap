@@ -1,5 +1,7 @@
 # 安装（新电脑从零开始）
 
+跟着视频一步步做：[演示教程（B 站，13 分钟）](https://www.bilibili.com/video/BV1VqJt6nEFD/)，安装部分在 01:20–03:58。
+
 整个流程只在 **Windows 10/11 + NVIDIA 显卡** 上测过（作者用 RTX 3090，24 GB 显存）。装完用 `python -m aimocap doctor` 逐项检查，缺什么它会告诉你怎么补。
 
 ## 1. 先装这些
@@ -55,6 +57,8 @@ git config core.hooksPath hooks                                        # 推送�
 ---
 
 ## Installation (English, short)
+
+Video walkthrough (Chinese): https://www.bilibili.com/video/BV1VqJt6nEFD/
 
 Tested on Windows 10/11 with an NVIDIA GPU. Install UE 5.8, Python 3.13 (`pip install numpy scipy matplotlib`), Blender 4.x, ffmpeg, WSL2 Ubuntu 24.04, and optionally the Dreamina CLI. Install [GVHMR](https://github.com/zju3dv/GVHMR/blob/main/docs/INSTALL.md) inside WSL at `~/mocap/GVHMR` using an in-folder `.venv` (plus `smplx opencv-python`), with the checkpoints and SMPL/SMPL-X body models listed above. Then:
 
