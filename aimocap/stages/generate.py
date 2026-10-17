@@ -1,4 +1,5 @@
-"""阶段 generate：用 Seedance 生成双人对拆视频（已有 input/video.mp4 则跳过）。
+"""阶段 generate：用 Seedance 生成动捕源视频（已有 input/video.mp4 则跳过）。
+有 input/music.*（舞蹈）时走全能参考 multimodal2video：构图板 + 配乐，动作跟着音乐；否则 image2video。
 积分按实测单价估算，超过 [generate].max_credits 拒绝执行。"""
 import time
 import urllib.request
@@ -8,6 +9,38 @@ from ..util import extract_json, file_sig, load_json, log, run as sh
 
 # 实测单价（积分/秒，seedance2.5）：480p 15s=180，1080p 15s=960。720p 未实测，按中间值估。
 COST_PER_SEC = {"480p": 12, "720p": 32, "1080p": 64}
+# 全能参考（multimodal2video，seedance2.5）：480p 15s 图+配乐=100（10-15 dance_01）；带参考视频 480p 15s=270（09-24）；
+# 720p 15s=300 / 25s=500（图片参考）。1080p 未实测。这里只用于图+配乐，按 7/s 估（略高于实测）。
+COST_PER_SEC_MM = {"480p": 7, "720p": 20, "1080p": 64}
+RATIOS = {"1:1": 1.0, "3:4": 0.75, "16:9": 16 / 9, "4:3": 4 / 3, "9:16": 9 / 16, "21:9": 21 / 9}
+MUSIC_EXT = (".wav", ".mp3", ".flac", ".m4a")
+# 带参考视频（动作迁移）480p 15s = 270（09-24 实测）
+COST_PER_SEC_REF = {"480p": 18, "720p": 32, "1080p": 64}
+
+
+def ref_video(c):
+    """input/ref.mp4：动作参考视频（全能参考 @视频1，Seedance 把动作迁移到构图板的人身上）。"""
+    for ext in (".mp4", ".mov", ".webm"):
+        p = c.input / f"ref{ext}"
+        if p.exists():
+            return p
+    return None
+
+
+def music(c):
+    for ext in MUSIC_EXT:
+        p = c.input / f"music{ext}"
+        if p.exists():
+            return p
+    return None
+
+
+def plate_ratio(plate):
+    """multimodal2video 不跟随首帧比例（默认 16:9），按构图板宽高比取最接近的一档。"""
+    from PIL import Image
+    with Image.open(plate) as im:
+        a = im.width / im.height
+    return min(RATIOS, key=lambda k: abs(RATIOS[k] - a))
 
 
 def gen_cfg(c, cfg):
@@ -15,14 +48,17 @@ def gen_cfg(c, cfg):
     return {**cfg["generate"], **(load_json(c.input / "generate.json", {}) or {})}
 
 
-def estimate(cfg, resolution=None, duration=None):
+def estimate(cfg, resolution=None, duration=None, multimodal=False, ref=False):
     g = cfg["generate"]
-    return COST_PER_SEC[resolution or g["resolution"]] * int(duration or g["duration"])
+    table = COST_PER_SEC_REF if ref else COST_PER_SEC_MM if multimodal else COST_PER_SEC
+    return table[resolution or g["resolution"]] * int(duration or g["duration"])
 
 
 def params(c, cfg):
     return {"video": file_sig(c.video), "prompt": file_sig(c.prompt),
-            "plate": file_sig(c.plate()) if c.plate() else None, **gen_cfg(c, cfg)}
+            "plate": file_sig(c.plate()) if c.plate() else None,
+            "music": file_sig(music(c)) if music(c) else None,
+            "ref": file_sig(ref_video(c)) if ref_video(c) else None, **gen_cfg(c, cfg)}
 
 
 def outputs(c, cfg):
@@ -96,7 +132,8 @@ def run_(c, cfg, args):
     plate = c.plate()
     if not c.prompt.exists() or plate is None:
         raise SystemExit(f"没有 {c.video}，也缺少生成所需的 input/prompt.txt 或 input/plate.*")
-    est = estimate(cfg, g["resolution"], g["duration"])
+    mus, ref = music(c), ref_video(c)
+    est = estimate(cfg, g["resolution"], g["duration"], multimodal=bool(mus or ref), ref=ref is not None)
     if est > g["max_credits"]:
         raise SystemExit(f"预估 {est} 积分，超过 max_credits={g['max_credits']}，未执行")
     if not getattr(args, "allow_spend", False):
@@ -107,16 +144,22 @@ def run_(c, cfg, args):
                          "解决：UE 菜单「AI 动捕 → 即梦账号 / 连接…」，或在普通终端运行 python -m aimocap dreamina login，"
                          "用抖音扫码授权。\n"
                          "注意：在 Claude 桌面应用（MSIX）里登录的令牌会被隔离，UE 和普通终端看不到。")
-    log(f"生成视频：{g['model']} {g['resolution']} {g['duration']}s，预估 {est} 积分，当前余额 {before}")
+    log(f"生成视频：{g['model']} {g['resolution']} {g['duration']}s{'（配乐 ' + mus.name + '）' if mus else ''}，"
+        f"预估 {est} 积分，当前余额 {before}")
     prompt = c.prompt.read_text(encoding="utf-8").strip()
+    if mus or ref:
+        cli_args = ["multimodal2video", f"--image={plate}", f"--prompt={prompt}", f"--ratio={g.get('ratio') or plate_ratio(plate)}"]
+        cli_args += [f"--video={ref}"] if ref else []
+        cli_args += [f"--audio={mus}"] if mus else []
+    else:
+        cli_args = ["image2video", f"--image={plate}", f"--prompt={prompt}"]
     # 两类失败不扣费，自动重试（最多 2 次，不占 retries）：
     #   提交前被拒「未检测到有效登录态」；图片上传到字节存储失败（2026-09-28 实测偶发，任务未生成、余额不变）。
     # retries 只管其它可能已扣费的失败。
     last, attempt, free_left, paid_left = None, 0, 2, g["retries"]
     while True:
         attempt += 1
-        j, out = _cli(cfg, ["image2video", f"--image={plate}", f"--prompt={prompt}",
-                            f"--model_version={g['model']}", f"--duration={g['duration']}",
+        j, out = _cli(cfg, [*cli_args, f"--model_version={g['model']}", f"--duration={g['duration']}",
                             f"--video_resolution={g['resolution']}", "--poll=0"], c.logs / "generate_submit.log")
         sid = j.get("submit_id")
         if not sid:

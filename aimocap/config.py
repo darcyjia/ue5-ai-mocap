@@ -63,6 +63,19 @@ def _merge(a, b):
     return out
 
 
+def for_clip(cfg, clip_root):
+    """单条素材的覆盖：<素材>/input/config.toml（任意段落，比如单人舞蹈 [solve] num_people = 1、
+    [impact] enabled = false），叠加在全局配置之上。"""
+    p = Path(clip_root) / "input" / "config.toml"
+    if not p.exists():
+        return cfg
+    cfg = _merge(cfg, tomllib.loads(p.read_text(encoding="utf-8")))
+    n = cfg["solve"]["num_people"]
+    if len(cfg["person"]) < n:
+        raise SystemExit(f"{p} 之后只有 {len(cfg['person'])} 个 [[person]]，但 num_people = {n}")
+    return cfg
+
+
 def load(path=None):
     """config.toml，再叠加可选的 config.local.toml。"""
     cfg = DEFAULTS

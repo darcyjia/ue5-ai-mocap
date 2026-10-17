@@ -3,6 +3,23 @@
 版本号：`主.次.修订`。改了阶段产物格式或配置项 → 次版本；修 bug、调阈值 → 修订号。
 发版：`git tag -a vX.Y.Z -m "说明" && git push origin vX.Y.Z`
 
+## 未发布（舞蹈模式，实验）
+
+单人舞蹈：配乐 + 动作参考视频 → Seedance → 动捕 → 动作卡点。测试素材：初音风格偶像舞（15 s）、闪身步（12 s / 28 s 组合）。
+
+**生成**
+- 每条素材可以有 `input/config.toml` 覆盖全局配置（比如单人舞蹈 `[solve] num_people = 1`、关掉 `impact` / `face`）
+- `input/music.*` 存在时走全能参考 `multimodal2video`（构图板 + 配乐，按构图板比例传 `--ratio`）；`input/ref.mp4` 作为动作参考视频（`--video`）。实测计费：图 + 配乐 480p 7 积分/秒，带参考视频 18 积分/秒
+- 注意：Seedance 不会照配乐的节奏跳，也会改配乐（截掉开头、重复段落），所以成片音乐和动作卡点在后期做
+
+**配乐和卡点工具（`scripts/dance/`）**
+- `music_pick.py`：从长配乐里挑一段从小节头开始、没有掉坑的 N 秒（ACE-Step 只生成 15 s 会提前收尾，先生成 30–60 s 再切）
+- `align_audio.py`：找出视频音轨在原配乐里的位置，切出对齐的干净段
+- `separate_vocals.py`：Demucs 人声分离（口型用，单独的 `.venv-sep`）
+- `accents.py`：动作重音——闪（骨盆水平速度峰）、踢（脚踝最高点）、回头（头部偏航角速度）
+- `beat_fit.py`：在原曲里选起点，让强拍对上重音
+- `beat_warp.py`：动作分段微调速度（0.8–1.2 倍），把重音挪到拍点上（`--subdiv 2` 允许落八分音符），然后 `export_fbx.py --npz-dir` 出 FBX。闪身步 28 s：14 个重音用上 12 个，平均误差 36 ms
+
 ## v0.5.0 — 2026-10-15
 
 公开发布（github.com/darcyjia/ue5-ai-mocap）。整个流程都能在插件菜单里完成。「运镜预演」「渲染设置」两个菜单是测试版：命令行已测通，编辑器里有问题请提 Issue。

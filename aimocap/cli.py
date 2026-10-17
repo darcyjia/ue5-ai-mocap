@@ -47,7 +47,13 @@ def cmd_new(cfg, a):
     log(f"素材目录：{c.root}")
 
 
+def clip_cfg(cfg, clip_name):
+    """全局配置 + 素材自己的 input/config.toml。"""
+    return C.for_clip(cfg, Clip(cfg, clip_name).root)
+
+
 def run_stages(cfg, clip_name, frm=None, to=None, only=None, force=False, args=None):
+    cfg = clip_cfg(cfg, clip_name)
     c = Clip(cfg, clip_name)
     c.mk()
     st = State(c)
@@ -76,6 +82,7 @@ def run_stages(cfg, clip_name, frm=None, to=None, only=None, force=False, args=N
 
 def mark_done(cfg, clip_name, stage, info=None):
     """外部（编辑器插件）完成了某阶段时登记到 state.json，参数指纹与 run 的算法一致。"""
+    cfg = clip_cfg(cfg, clip_name)
     c = Clip(cfg, clip_name)
     st = State(c)
     i = NAMES.index(stage)
@@ -170,7 +177,7 @@ def main(argv=None):
         print(json.dumps({"estimate": generate.estimate(cfg, a.resolution, a.duration), "balance": generate.credits(cfg),
                           "max_credits": cfg["generate"]["max_credits"]}, ensure_ascii=False))
     elif a.cmd == "uejob":
-        print(json.dumps(ue.build_job(Clip(cfg, a.clip), cfg), ensure_ascii=False))
+        print(json.dumps(ue.build_job(Clip(cfg, a.clip), clip_cfg(cfg, a.clip)), ensure_ascii=False))
     elif a.cmd == "mark":
         mark_done(cfg, a.clip, a.stage, load_json(Clip(cfg, a.clip).ue / "result.json") if a.stage == "ue" else None)
         log(f"已登记 {a.clip} 的 {a.stage} 阶段")
