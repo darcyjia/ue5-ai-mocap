@@ -126,8 +126,6 @@ curl -L -o models/hand_landmarker.task https://storage.googleapis.com/mediapipe-
 - 720p 的积分单价未实测，是估算值
 
 ## 版本管理
-
-- 仓库：https://github.com/darcyjia/aimocap（私有），默认分支 `main`
 - 新克隆后执行一次 `git config core.hooksPath hooks`，启用推送前的回归测试钩子
 - 日常：改代码 → `python -m aimocap test` → 提交 → `git push`（钩子会再跑一次测试，指标变差会拒绝推送）
 - 大改动或试验性改动开分支：`git switch -c 试验名`，验证通过再合回 `main`
